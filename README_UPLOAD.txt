@@ -57,3 +57,5 @@ V4.6 UPDATE:
 6. OCR scanner workflow added for VIN, invoice/receipt, part labels, documents/fault screens.
 7. AI backend settings added for future endpoint/model connection.
 Sign-in remains last.
+
+V4.7: Added customer/driver signature pads for Quotes and Invoices. Works with touch, finger, stylus, mouse on iPhone, Android, tablet, and desktop. Signatures save into preview and records.

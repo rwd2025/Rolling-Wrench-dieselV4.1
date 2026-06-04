@@ -523,6 +523,110 @@ function aiBuildFromSpokenJob(text){
   if(q.includes("roadside")){ result.source += " • Roadside service"; }
   return result;
 }
+
+function signatureBlock(prefix, label="Customer / Driver Signature"){
+  return `<div class="signature-card">
+    <b>${label}</b>
+    <div class="signature-meta">
+      <label>Printed Name<input id="${prefix}SignerName" placeholder="Driver / customer name"></label>
+      <label>Title / Company<input id="${prefix}SignerTitle" placeholder="Driver / manager / company"></label>
+    </div>
+    <div class="signature-pad-wrap"><canvas id="${prefix}SignaturePad" class="signature-pad"></canvas></div>
+    <div class="signature-actions">
+      <button type="button" id="${prefix}ClearSignature" class="clear-signature">Clear</button>
+      <button type="button" id="${prefix}SaveSignature">Save Signature</button>
+      <button type="button" id="${prefix}TimestampSignature">Add Time Stamp</button>
+    </div>
+    <span class="signature-status" id="${prefix}SignatureStatus">No signature saved yet.</span>
+    <div class="signature-preview" id="${prefix}SignaturePreview" hidden></div>
+  </div>`;
+}
+function setupSignaturePad(prefix){
+  const canvas = document.getElementById(`${prefix}SignaturePad`);
+  if(!canvas) return;
+  const ctx = canvas.getContext("2d");
+  let drawing = false;
+  let last = null;
+  function fit(){
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = Math.max(300, Math.floor(rect.width * window.devicePixelRatio));
+    canvas.height = Math.floor(190 * window.devicePixelRatio);
+    ctx.setTransform(window.devicePixelRatio,0,0,window.devicePixelRatio,0,0);
+    ctx.lineWidth = 3;
+    ctx.lineCap = "round";
+    ctx.strokeStyle = "#10141a";
+  }
+  setTimeout(fit, 60);
+  function point(e){
+    const r = canvas.getBoundingClientRect();
+    const p = e.touches ? e.touches[0] : e;
+    return {x:p.clientX-r.left, y:p.clientY-r.top};
+  }
+  function start(e){ e.preventDefault(); drawing=true; last=point(e); }
+  function move(e){
+    if(!drawing) return;
+    e.preventDefault();
+    const p = point(e);
+    ctx.beginPath();
+    ctx.moveTo(last.x,last.y);
+    ctx.lineTo(p.x,p.y);
+    ctx.stroke();
+    last = p;
+  }
+  function stop(){ drawing=false; }
+  canvas.addEventListener("mousedown", start);
+  canvas.addEventListener("mousemove", move);
+  canvas.addEventListener("mouseup", stop);
+  canvas.addEventListener("mouseleave", stop);
+  canvas.addEventListener("touchstart", start, {passive:false});
+  canvas.addEventListener("touchmove", move, {passive:false});
+  canvas.addEventListener("touchend", stop);
+  const clearBtn = document.getElementById(`${prefix}ClearSignature`);
+  const saveBtn = document.getElementById(`${prefix}SaveSignature`);
+  const tsBtn = document.getElementById(`${prefix}TimestampSignature`);
+  if(clearBtn) clearBtn.onclick = () => {
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    state[`${prefix}Signature`] = null;
+    saveState();
+    document.getElementById(`${prefix}SignatureStatus`).textContent = "Signature cleared.";
+    document.getElementById(`${prefix}SignaturePreview`).hidden = true;
+  };
+  if(saveBtn) saveBtn.onclick = () => saveSignature(prefix);
+  if(tsBtn) tsBtn.onclick = () => {
+    const name = document.getElementById(`${prefix}SignerName`)?.value || "Signed";
+    const title = document.getElementById(`${prefix}SignerTitle`)?.value || "";
+    ctx.font = "12px Arial";
+    ctx.fillStyle = "#10141a";
+    ctx.fillText(`${name} ${title} — ${new Date().toLocaleString()}`, 12, 178);
+    saveSignature(prefix);
+  };
+}
+function saveSignature(prefix){
+  const canvas = document.getElementById(`${prefix}SignaturePad`);
+  if(!canvas) return "";
+  const data = canvas.toDataURL("image/png");
+  state[`${prefix}Signature`] = {
+    data,
+    name:document.getElementById(`${prefix}SignerName`)?.value || "",
+    title:document.getElementById(`${prefix}SignerTitle`)?.value || "",
+    date:new Date().toLocaleString()
+  };
+  saveState();
+  const preview = document.getElementById(`${prefix}SignaturePreview`);
+  if(preview){
+    preview.hidden = false;
+    preview.innerHTML = `<b>Saved Signature</b><img src="${data}" alt="Signature"><small>${state[`${prefix}Signature`].name || "Signed"} • ${state[`${prefix}Signature`].date}</small>`;
+  }
+  const status = document.getElementById(`${prefix}SignatureStatus`);
+  if(status) status.textContent = `Signature saved ${state[`${prefix}Signature`].date}`;
+  toast("Signature saved");
+  return data;
+}
+function docSignatureHtml(prefix){
+  const sig = state[`${prefix}Signature`];
+  if(!sig || !sig.data) return `<div class="signature-line-doc"><b>Customer / Driver Signature</b><div style="height:70px;border-bottom:1px solid #17202b;"></div><small>Not signed yet</small></div>`;
+  return `<div class="signature-line-doc"><b>Customer / Driver Signature</b><img src="${sig.data}" alt="Signature"><small>${sig.name || "Signed"} ${sig.title ? "• "+sig.title : ""} • ${sig.date}</small></div>`;
+}
 function renderQuotes(){
   $("#screen").innerHTML = `${pageHead("Smart Quotes","saveQuote")}
     <section class="pro-doc-shell form-grid">
@@ -534,10 +638,12 @@ function renderQuotes(){
       <div class="line-item-box form-grid"><b>Labor / Service</b><div class="two-col"><label>Labor Hours<input id="quoteHours" type="number" step=".1"></label><label>Rate<input id="quoteRate" type="number" value="${state.settings.laborRate}"></label></div><div class="two-col"><label>Service Call<input id="quoteCall" type="number" value="${state.settings.serviceCall}"></label><label>Travel / Mileage<input id="quoteTravel" type="number" step=".01"></label></div></div>
       <div class="line-item-box form-grid"><b>Parts / Supplies</b><label>Parts Needed<textarea id="quotePartsList" placeholder="Water pump, gasket, belt, coolant..."></textarea></label><div class="two-col"><label>Parts Total<input id="quoteParts" type="number" step=".01"></label><label>Supplies<input id="quoteSupplies" type="number" step=".01"></label></div><label>Parts Source / Location<input id="quotePartSource" placeholder="FleetPride / dealer / NAPA / TruckPro / location / price source"></label></div>
       <div class="two-col"><label>Tax / Fees<input id="quoteFees" type="number" step=".01"></label><label>Markup / Misc<input id="quoteMisc" type="number" step=".01"></label></div>
+      ${signatureBlock("quote","Customer / Driver Quote Approval")}
       <button class="action-btn primary" id="previewQuote">Preview Professional Quote</button>
       <div id="quotePreviewWrap"></div>
     </section>`;
   bindPageTools();
+  setupSignaturePad("quote");
   if($("#speakQuote")) $("#speakQuote").onclick=()=>startVoiceToField("quoteVoiceText", spoken=>{ $("#quoteAiJob").value=spoken; });
   if($("#voiceFillQuote")) $("#voiceFillQuote").onclick=()=>{ 
     const built = aiBuildFromSpokenJob($("#quoteVoiceText").value || $("#quoteAiJob").value);
@@ -554,7 +660,7 @@ function renderQuotes(){
   const n=id=>Number(v(id)||0);
   const calc=()=> n("quoteHours")*n("quoteRate")+n("quoteCall")+n("quoteTravel")+n("quoteParts")+n("quoteSupplies")+n("quoteFees")+n("quoteMisc");
   $("#aiBuildQuote").onclick=()=>{const job=v("quoteAiJob").toLowerCase();$("#quoteDesc").value=v("quoteAiJob");let hours=3.5,parts="Parts to verify by VIN / supplier",supplies=25;if(job.includes("water pump")){hours=3.5;parts="Water pump\\nGasket/seal kit\\nBelt if needed\\nCoolant\\nShop supplies";supplies=35}if(job.includes("clutch")){hours=11.5;parts="Clutch kit\\nPilot bearing\\nFlywheel resurface/replacement as needed\\nTransmission fluid if needed";supplies=45}if(job.includes("wheel seal")){hours=2.5;parts="Wheel seal\\nHub cap gasket\\nGear oil\\nBrake clean/shop supplies";supplies=25}if(job.includes("brake")){hours=3.0;parts="Brake parts as applicable\\nHardware kit\\nDrums/rotors if needed\\nShop supplies";supplies=25}$("#quoteHours").value=hours;$("#quotePartsList").value=parts;$("#quoteSupplies").value=supplies;$("#quotePartSource").value="Parts price/location to be verified before final approval";toast("AI quote filled");buildQuotePreview()};
-  function buildQuotePreview(){const labor=n("quoteHours")*n("quoteRate");const subtotal=calc();const disclaimer="Estimate only. Final price may increase or decrease based on additional labor, seized/broken hardware, hidden damage, diagnostic findings, parts availability, freight, shop supplies, taxes/fees, travel, or extra time required to complete the repair. Customer approval required before additional work is performed. Parts pricing and availability may change until purchased.";$("#quotePreviewWrap").innerHTML=`<div class="pro-doc-preview"><div class="pro-doc-top"><div class="pro-doc-logo"><div class="doc-rw">RW</div><div><h3>${state.settings.shop || "Rolling Wrench Diesel"}</h3><p>${state.settings.phone || ""} • Mobile Diesel Repair</p></div></div><div class="doc-type"><b>Quote</b><small>${new Date().toLocaleDateString()}</small></div></div><div class="pro-info-grid"><div class="pro-info-box"><b>Customer</b><span>${v("quoteCustomer") || "Customer"}</span></div><div class="pro-info-box"><b>Truck / VIN</b><span>${v("quoteTruck") || "Truck / VIN"}</span></div><div class="pro-info-box"><b>Job</b><span>${v("quoteDesc") || "Repair estimate"}</span></div><div class="pro-info-box"><b>Parts Source</b><span>${v("quotePartSource") || "To be verified"}</span></div></div><table class="pro-table"><thead><tr><th>Description</th><th>Qty/Hours</th><th>Rate/Cost</th><th>Total</th></tr></thead><tbody><tr><td>Labor</td><td>${v("quoteHours")} hrs</td><td>${money(n("quoteRate"))}</td><td>${money(labor)}</td></tr><tr><td>Service Call</td><td>1</td><td>${money(n("quoteCall"))}</td><td>${money(n("quoteCall"))}</td></tr><tr><td>Travel / Mileage</td><td>1</td><td>${money(n("quoteTravel"))}</td><td>${money(n("quoteTravel"))}</td></tr><tr><td>Parts<br><small>${v("quotePartsList").replaceAll("\\n","<br>")}</small></td><td>1</td><td>${money(n("quoteParts"))}</td><td>${money(n("quoteParts"))}</td></tr><tr><td>Supplies / Fees / Misc</td><td>1</td><td>${money(n("quoteSupplies")+n("quoteFees")+n("quoteMisc"))}</td><td>${money(n("quoteSupplies")+n("quoteFees")+n("quoteMisc"))}</td></tr></tbody></table><div class="pro-total-box"><div class="pro-total-row"><span>Subtotal</span><b>${money(subtotal)}</b></div><div class="pro-total-row grand"><span>Estimated Total</span><b>${money(subtotal)}</b></div></div><div class="pro-note"><b>Estimate Disclaimer:</b> ${disclaimer}</div></div><div class="pro-actions"><button id="convertQuoteInvoice">Convert to Invoice</button><button id="saveQuoteAgain">Save Quote</button><button onclick="window.print()">Print / Save PDF</button></div>`;$("#saveQuoteAgain").onclick=()=>$("#saveQuote").click();$("#convertQuoteInvoice").onclick=()=>{state.invoices.push({customer:v("quoteCustomer"),truck:v("quoteTruck"),work:v("quoteDesc"),total:subtotal,date:new Date().toLocaleString(),fromQuote:true});saveState();toast("Converted to invoice")}}
+  function buildQuotePreview(){const labor=n("quoteHours")*n("quoteRate");const subtotal=calc();const disclaimer="Estimate only. Final price may increase or decrease based on additional labor, seized/broken hardware, hidden damage, diagnostic findings, parts availability, freight, shop supplies, taxes/fees, travel, or extra time required to complete the repair. Customer approval required before additional work is performed. Parts pricing and availability may change until purchased.";$("#quotePreviewWrap").innerHTML=`<div class="pro-doc-preview"><div class="pro-doc-top"><div class="pro-doc-logo"><div class="doc-rw">RW</div><div><h3>${state.settings.shop || "Rolling Wrench Diesel"}</h3><p>${state.settings.phone || ""} • Mobile Diesel Repair</p></div></div><div class="doc-type"><b>Quote</b><small>${new Date().toLocaleDateString()}</small></div></div><div class="pro-info-grid"><div class="pro-info-box"><b>Customer</b><span>${v("quoteCustomer") || "Customer"}</span></div><div class="pro-info-box"><b>Truck / VIN</b><span>${v("quoteTruck") || "Truck / VIN"}</span></div><div class="pro-info-box"><b>Job</b><span>${v("quoteDesc") || "Repair estimate"}</span></div><div class="pro-info-box"><b>Parts Source</b><span>${v("quotePartSource") || "To be verified"}</span></div></div><table class="pro-table"><thead><tr><th>Description</th><th>Qty/Hours</th><th>Rate/Cost</th><th>Total</th></tr></thead><tbody><tr><td>Labor</td><td>${v("quoteHours")} hrs</td><td>${money(n("quoteRate"))}</td><td>${money(labor)}</td></tr><tr><td>Service Call</td><td>1</td><td>${money(n("quoteCall"))}</td><td>${money(n("quoteCall"))}</td></tr><tr><td>Travel / Mileage</td><td>1</td><td>${money(n("quoteTravel"))}</td><td>${money(n("quoteTravel"))}</td></tr><tr><td>Parts<br><small>${v("quotePartsList").replaceAll("\\n","<br>")}</small></td><td>1</td><td>${money(n("quoteParts"))}</td><td>${money(n("quoteParts"))}</td></tr><tr><td>Supplies / Fees / Misc</td><td>1</td><td>${money(n("quoteSupplies")+n("quoteFees")+n("quoteMisc"))}</td><td>${money(n("quoteSupplies")+n("quoteFees")+n("quoteMisc"))}</td></tr></tbody></table><div class="pro-total-box"><div class="pro-total-row"><span>Subtotal</span><b>${money(subtotal)}</b></div><div class="pro-total-row grand"><span>Estimated Total</span><b>${money(subtotal)}</b></div></div><div class="pro-note"><b>Estimate Disclaimer:</b> ${disclaimer}</div>${docSignatureHtml("quote")}</div><div class="pro-actions"><button id="convertQuoteInvoice">Convert to Invoice</button><button id="saveQuoteAgain">Save Quote</button><button onclick="window.print()">Print / Save PDF</button></div>`;$("#saveQuoteAgain").onclick=()=>$("#saveQuote").click();$("#convertQuoteInvoice").onclick=()=>{state.invoices.push({customer:v("quoteCustomer"),truck:v("quoteTruck"),work:v("quoteDesc"),total:subtotal,date:new Date().toLocaleString(),fromQuote:true});saveState();toast("Converted to invoice")}}
   $("#previewQuote").onclick=buildQuotePreview;
   $("#saveQuote").onclick=()=>{state.quotes.push({customer:v("quoteCustomer"),truck:v("quoteTruck"),desc:v("quoteDesc"),hours:n("quoteHours"),rate:n("quoteRate"),parts:v("quotePartsList"),source:v("quotePartSource"),total:calc(),date:new Date().toLocaleString()});addTruckHistory("Quote", `${v("quoteDesc")} - ${money(calc())}`);saveState();toast("Quote saved")};
 }
@@ -569,10 +675,12 @@ function renderInvoices(){
       <div class="line-item-box form-grid"><b>Labor / Service</b><div class="two-col"><label>Labor Hours<input id="invHours" type="number" step=".1"></label><label>Rate<input id="invRate" type="number" value="${state.settings.laborRate}"></label></div><div class="two-col"><label>Service Call<input id="invCall" type="number" value="${state.settings.serviceCall}"></label><label>Travel / Mileage<input id="invTravel" type="number" step=".01"></label></div></div>
       <div class="line-item-box form-grid"><b>Parts / Charges</b><label>Parts / Materials<textarea id="invPartsList" placeholder="List parts/materials used"></textarea></label><div class="two-col"><label>Parts Total<input id="invParts" type="number" step=".01"></label><label>Supplies<input id="invSupplies" type="number" step=".01"></label></div><div class="two-col"><label>Tax / Fees<input id="invFees" type="number" step=".01"></label><label>Discount<input id="invDiscount" type="number" step=".01"></label></div></div>
       <label>Customer Notes / Warranty / Recommendations<textarea id="invNotes" placeholder="Example: Recheck U-bolts after 50-100 miles. No road test performed. Customer supplied parts."></textarea></label>
+      ${signatureBlock("invoice","Customer / Driver Invoice Approval")}
       <button class="action-btn primary" id="previewInv">Preview Professional Invoice</button>
       <div id="invoicePreviewWrap"></div>
     </section>`;
   bindPageTools();
+  setupSignaturePad("invoice");
   if($("#speakInvoice")) $("#speakInvoice").onclick=()=>startVoiceToField("invoiceVoiceText", spoken=>{ $("#invWork").value=professionalizeWorkText(spoken); });
   if($("#voiceFillInvoice")) $("#voiceFillInvoice").onclick=()=>{ 
     const built = aiBuildFromSpokenJob($("#invoiceVoiceText").value || $("#invWork").value);
@@ -586,7 +694,7 @@ function renderInvoices(){
   const v=id=>document.getElementById(id)?.value || "";
   const n=id=>Number(v(id)||0);
   const calc=()=> n("invHours")*n("invRate")+n("invCall")+n("invTravel")+n("invParts")+n("invSupplies")+n("invFees")-n("invDiscount");
-  function buildInvoicePreview(){const labor=n("invHours")*n("invRate");const total=calc();$("#invoicePreviewWrap").innerHTML=`<div class="pro-doc-preview"><div class="pro-doc-top"><div class="pro-doc-logo"><div class="doc-rw">RW</div><div><h3>${state.settings.shop || "Rolling Wrench Diesel"}</h3><p>${state.settings.phone || ""} • Mobile Diesel & Equipment Repair</p></div></div><div class="doc-type"><b>Invoice</b><small>${new Date().toLocaleDateString()}<br>Due Upon Receipt</small></div></div><div class="pro-info-grid"><div class="pro-info-box"><b>Bill To</b><span>${v("invCustomer") || "Customer"}</span></div><div class="pro-info-box"><b>Truck / VIN</b><span>${v("invTruck") || "Truck / VIN"}</span></div><div class="pro-info-box"><b>Work Performed</b><span>${v("invWork") || "Work performed"}</span></div><div class="pro-info-box"><b>Payment</b><span>Due upon receipt unless otherwise agreed. Card processing fees may apply.</span></div></div><table class="pro-table"><thead><tr><th>Description</th><th>Qty/Hours</th><th>Rate/Cost</th><th>Total</th></tr></thead><tbody><tr><td>Labor</td><td>${v("invHours")} hrs</td><td>${money(n("invRate"))}</td><td>${money(labor)}</td></tr><tr><td>Service Call</td><td>1</td><td>${money(n("invCall"))}</td><td>${money(n("invCall"))}</td></tr><tr><td>Travel / Mileage</td><td>1</td><td>${money(n("invTravel"))}</td><td>${money(n("invTravel"))}</td></tr><tr><td>Parts / Materials<br><small>${v("invPartsList").replaceAll("\\n","<br>")}</small></td><td>1</td><td>${money(n("invParts"))}</td><td>${money(n("invParts"))}</td></tr><tr><td>Supplies / Tax / Fees</td><td>1</td><td>${money(n("invSupplies")+n("invFees"))}</td><td>${money(n("invSupplies")+n("invFees"))}</td></tr>${n("invDiscount") ? `<tr><td>Discount</td><td>1</td><td>-${money(n("invDiscount"))}</td><td>-${money(n("invDiscount"))}</td></tr>` : ""}</tbody></table><div class="pro-total-box"><div class="pro-total-row"><span>Subtotal</span><b>${money(total)}</b></div><div class="pro-total-row grand"><span>Total Due</span><b>${money(total)}</b></div></div><div class="pro-note"><b>Notes / Terms:</b> ${v("invNotes") || "Customer authorizes listed work. Additional issues found after teardown or diagnostics may require additional approval. Parts availability and pricing may vary. Payment due upon receipt."}</div></div><div class="pro-actions"><button id="saveInvoiceAgain">Save Invoice</button><button onclick="window.print()">Print / Save PDF</button><button id="textInvoice">Text/Share Ready</button></div>`;$("#saveInvoiceAgain").onclick=()=>$("#saveInvoice").click();$("#textInvoice").onclick=()=>toast("Use browser share/print or screenshot preview")}
+  function buildInvoicePreview(){const labor=n("invHours")*n("invRate");const total=calc();$("#invoicePreviewWrap").innerHTML=`<div class="pro-doc-preview"><div class="pro-doc-top"><div class="pro-doc-logo"><div class="doc-rw">RW</div><div><h3>${state.settings.shop || "Rolling Wrench Diesel"}</h3><p>${state.settings.phone || ""} • Mobile Diesel & Equipment Repair</p></div></div><div class="doc-type"><b>Invoice</b><small>${new Date().toLocaleDateString()}<br>Due Upon Receipt</small></div></div><div class="pro-info-grid"><div class="pro-info-box"><b>Bill To</b><span>${v("invCustomer") || "Customer"}</span></div><div class="pro-info-box"><b>Truck / VIN</b><span>${v("invTruck") || "Truck / VIN"}</span></div><div class="pro-info-box"><b>Work Performed</b><span>${v("invWork") || "Work performed"}</span></div><div class="pro-info-box"><b>Payment</b><span>Due upon receipt unless otherwise agreed. Card processing fees may apply.</span></div></div><table class="pro-table"><thead><tr><th>Description</th><th>Qty/Hours</th><th>Rate/Cost</th><th>Total</th></tr></thead><tbody><tr><td>Labor</td><td>${v("invHours")} hrs</td><td>${money(n("invRate"))}</td><td>${money(labor)}</td></tr><tr><td>Service Call</td><td>1</td><td>${money(n("invCall"))}</td><td>${money(n("invCall"))}</td></tr><tr><td>Travel / Mileage</td><td>1</td><td>${money(n("invTravel"))}</td><td>${money(n("invTravel"))}</td></tr><tr><td>Parts / Materials<br><small>${v("invPartsList").replaceAll("\\n","<br>")}</small></td><td>1</td><td>${money(n("invParts"))}</td><td>${money(n("invParts"))}</td></tr><tr><td>Supplies / Tax / Fees</td><td>1</td><td>${money(n("invSupplies")+n("invFees"))}</td><td>${money(n("invSupplies")+n("invFees"))}</td></tr>${n("invDiscount") ? `<tr><td>Discount</td><td>1</td><td>-${money(n("invDiscount"))}</td><td>-${money(n("invDiscount"))}</td></tr>` : ""}</tbody></table><div class="pro-total-box"><div class="pro-total-row"><span>Subtotal</span><b>${money(total)}</b></div><div class="pro-total-row grand"><span>Total Due</span><b>${money(total)}</b></div></div><div class="pro-note"><b>Notes / Terms:</b> ${v("invNotes") || "Customer authorizes listed work. Additional issues found after teardown or diagnostics may require additional approval. Parts availability and pricing may vary. Payment due upon receipt."}</div>${docSignatureHtml("invoice")}</div><div class="pro-actions"><button id="saveInvoiceAgain">Save Invoice</button><button onclick="window.print()">Print / Save PDF</button><button id="textInvoice">Text/Share Ready</button></div>`;$("#saveInvoiceAgain").onclick=()=>$("#saveInvoice").click();$("#textInvoice").onclick=()=>toast("Use browser share/print or screenshot preview")}
   $("#previewInv").onclick=buildInvoicePreview;
   $("#saveInvoice").onclick=()=>{state.invoices.push({customer:v("invCustomer"),truck:v("invTruck"),work:v("invWork"),parts:v("invPartsList"),notes:v("invNotes"),total:calc(),date:new Date().toLocaleString()});addTruckHistory("Invoice", `${v("invWork")} - ${money(calc())}`);saveState();toast("Invoice saved")};
 }
