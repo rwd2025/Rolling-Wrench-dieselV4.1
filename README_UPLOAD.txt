@@ -43,3 +43,5 @@ V4.3 UPDATE:
 - AI conversations are saved in local storage and shown in a conversation list.
 - + menu supports photo/file/document/invoice/part/VIN/camera workflow.
 - Send button creates saved conversation messages.
+
+V4.4: upgraded Professional Invoice and Smart Quote screens with AI Fill, pro preview, line items, totals, print/PDF, convert quote to invoice, and price-variance disclaimer.
