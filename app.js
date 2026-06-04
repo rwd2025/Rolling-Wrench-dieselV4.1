@@ -410,6 +410,7 @@ function renderAi(){
 function renderParts(){
   $("#screen").innerHTML = `${pageHead("Parts Lookup","savePart")}
     <section class="form-panel form-grid">
+      <div class="voice-fill-panel"><b>Speak Parts Search</b><div class="voice-fill-row"><input id="partsVoiceText" placeholder="Say part, engine, VIN, or description"><button class="voice-pill" id="speakParts">🎙 Speak</button><button class="voice-pill orange" id="voiceFillParts">Fill</button></div></div>
       <label>Search<input id="partSearch" placeholder="VIN, engine, part number, description"></label>
       <div class="two-col"><label>Verified Part #<input id="partNumber"></label><label>Supplier / Price<input id="partSupplier"></label></div>
       <label>Notes<textarea id="partNotes" placeholder="Cross reference, fitment, source, availability"></textarea></label>
@@ -417,6 +418,8 @@ function renderParts(){
       <div class="output" id="partOut">Rule: exact OEM or UNKNOWN until verified by VIN/OEM/supplier.</div>
     </section>`;
   bindPageTools();
+  if($("#speakParts")) $("#speakParts").onclick=()=>startVoiceToField("partsVoiceText", spoken=>$("#partSearch").value=spoken);
+  if($("#voiceFillParts")) $("#voiceFillParts").onclick=()=>{ $("#partSearch").value=$("#partsVoiceText").value; toast("Parts search filled"); };
   $("#partBuild").onclick=()=>{$("#partOut").textContent=`PARTS LOOKUP\nQuery: ${$("#partSearch").value}\nActive Truck: ${state.truck.unit} / ${state.truck.vin}\nStatus: UNKNOWN until verified.`};
   $("#savePart").onclick=()=>{ state.parts.push({query:$("#partSearch").value,number:$("#partNumber").value,supplier:$("#partSupplier").value,notes:$("#partNotes").value,date:new Date().toLocaleString()}); saveState(); toast("Part saved"); };
 }
@@ -446,9 +449,60 @@ function renderRepairHud(){
   $("#saveRepair").onclick=()=>{ state.notes.push({type:"Repair",note:$("#repairText").value,date:new Date().toLocaleString()}); saveState(); toast("Repair saved"); };
 }
 
+
+function getSpeechSupported(){
+  return "webkitSpeechRecognition" in window || "SpeechRecognition" in window;
+}
+function startVoiceToField(fieldId, onDone){
+  const field = document.getElementById(fieldId);
+  if(!field){ toast("Voice target missing"); return; }
+  if(!getSpeechSupported()){
+    toast("Use phone keyboard mic");
+    field.focus();
+    return;
+  }
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const rec = new SR();
+  rec.lang="en-US"; rec.interimResults=false; rec.maxAlternatives=1;
+  toast("Listening...");
+  rec.onresult = e => {
+    const spoken = e.results[0][0].transcript;
+    field.value = spoken;
+    if(onDone) onDone(spoken);
+  };
+  rec.onerror = () => toast("Voice stopped");
+  rec.start();
+}
+function professionalizeWorkText(raw){
+  raw = (raw || "").trim();
+  if(!raw) return "";
+  return raw
+    .replace(/^customer says/i,"Customer concern:")
+    .replace(/\bfix\b/gi,"repair")
+    .replace(/\bchecked\b/gi,"inspected")
+    .replace(/\bdone\b/gi,"completed");
+}
+function aiBuildFromSpokenJob(text){
+  const q = (text || "").toLowerCase();
+  const result = {
+    desc: text,
+    hours: 3.0,
+    parts: "Parts to verify by VIN / supplier",
+    supplies: 25,
+    source: "Parts price/location to be verified before final approval"
+  };
+  if(q.includes("water pump")){ result.hours=3.5; result.parts="Water pump\nGasket/seal kit\nBelt if needed\nCoolant\nShop supplies"; result.supplies=35; }
+  if(q.includes("clutch")){ result.hours=11.5; result.parts="Clutch kit\nPilot bearing\nFlywheel inspection/resurface or replacement if needed\nTransmission fluid if needed\nShop supplies"; result.supplies=45; }
+  if(q.includes("wheel seal")){ result.hours=2.5; result.parts="Wheel seal\nHub cap gasket\nGear oil\nBrake clean/shop supplies"; result.supplies=25; }
+  if(q.includes("brake")){ result.hours=3.0; result.parts="Brake parts as applicable\nHardware kit\nDrums/rotors if needed\nShop supplies"; result.supplies=25; }
+  if(q.includes("diagnostic") || q.includes("diagnose")){ result.hours=1.5; result.parts="No parts quoted until diagnostic confirmation"; result.supplies=0; }
+  if(q.includes("roadside")){ result.source += " • Roadside service"; }
+  return result;
+}
 function renderQuotes(){
   $("#screen").innerHTML = `${pageHead("Smart Quotes","saveQuote")}
     <section class="pro-doc-shell form-grid">
+      <div class="voice-fill-panel"><b>Speak Quote</b><div class="voice-fill-row"><input id="quoteVoiceText" placeholder="Say the job: replace water pump on X15, clutch job, wheel seal roadside..."><button class="voice-pill" id="speakQuote">🎙 Speak</button><button class="voice-pill orange" id="voiceFillQuote">Fill Quote</button></div><span class="voice-status-text">Speak it once. AI fills labor, parts, and professional quote wording.</span></div>
       <div class="ai-fill-card"><b>AI Quote Builder</b><div class="ai-fill-row"><input id="quoteAiJob" placeholder="Say/type the job: X15 water pump, clutch, wheel seal..."><button class="action-btn primary" id="aiBuildQuote">AI Fill</button></div><small class="muted">AI fills labor time, rate, parts list, service call, and estimate. Review before saving.</small></div>
       <label>Customer<input id="quoteCustomer" value="${state.truck.customer || ""}"></label>
       <label>Truck / VIN<input id="quoteTruck" value="${state.truck.unit || ""} ${state.truck.vin || ""}"></label>
@@ -460,6 +514,18 @@ function renderQuotes(){
       <div id="quotePreviewWrap"></div>
     </section>`;
   bindPageTools();
+  if($("#speakQuote")) $("#speakQuote").onclick=()=>startVoiceToField("quoteVoiceText", spoken=>{ $("#quoteAiJob").value=spoken; });
+  if($("#voiceFillQuote")) $("#voiceFillQuote").onclick=()=>{ 
+    const built = aiBuildFromSpokenJob($("#quoteVoiceText").value || $("#quoteAiJob").value);
+    $("#quoteAiJob").value = built.desc;
+    $("#quoteDesc").value = professionalizeWorkText(built.desc);
+    $("#quoteHours").value = built.hours;
+    $("#quotePartsList").value = built.parts;
+    $("#quoteSupplies").value = built.supplies;
+    $("#quotePartSource").value = built.source;
+    toast("Voice quote filled");
+    if(typeof buildQuotePreview === "function") buildQuotePreview();
+  };
   const v=id=>document.getElementById(id)?.value || "";
   const n=id=>Number(v(id)||0);
   const calc=()=> n("quoteHours")*n("quoteRate")+n("quoteCall")+n("quoteTravel")+n("quoteParts")+n("quoteSupplies")+n("quoteFees")+n("quoteMisc");
@@ -472,6 +538,7 @@ function renderQuotes(){
 function renderInvoices(){
   $("#screen").innerHTML = `${pageHead("Professional Invoice","saveInvoice")}
     <section class="pro-doc-shell form-grid">
+      <div class="voice-fill-panel"><b>Speak Invoice</b><div class="voice-fill-row"><input id="invoiceVoiceText" placeholder="Say the work performed and charges..."><button class="voice-pill" id="speakInvoice">🎙 Speak</button><button class="voice-pill orange" id="voiceFillInvoice">Fill Invoice</button></div><span class="voice-status-text">Speak repair notes. AI cleans it up into professional invoice wording.</span></div>
       <label>Bill To<input id="invCustomer" value="${state.truck.customer || ""}"></label>
       <label>Truck / VIN<input id="invTruck" value="${state.truck.unit || ""} ${state.truck.vin || ""}"></label>
       <label>Work Performed<textarea id="invWork" placeholder="Complaint, cause, correction, final check..."></textarea></label>
@@ -482,6 +549,16 @@ function renderInvoices(){
       <div id="invoicePreviewWrap"></div>
     </section>`;
   bindPageTools();
+  if($("#speakInvoice")) $("#speakInvoice").onclick=()=>startVoiceToField("invoiceVoiceText", spoken=>{ $("#invWork").value=professionalizeWorkText(spoken); });
+  if($("#voiceFillInvoice")) $("#voiceFillInvoice").onclick=()=>{ 
+    const built = aiBuildFromSpokenJob($("#invoiceVoiceText").value || $("#invWork").value);
+    $("#invWork").value = professionalizeWorkText(built.desc);
+    if(!$("#invHours").value) $("#invHours").value = built.hours;
+    if(!$("#invPartsList").value) $("#invPartsList").value = built.parts;
+    if(!$("#invSupplies").value) $("#invSupplies").value = built.supplies;
+    toast("Voice invoice filled");
+    if(typeof buildInvoicePreview === "function") buildInvoicePreview();
+  };
   const v=id=>document.getElementById(id)?.value || "";
   const n=id=>Number(v(id)||0);
   const calc=()=> n("invHours")*n("invRate")+n("invCall")+n("invTravel")+n("invParts")+n("invSupplies")+n("invFees")-n("invDiscount");
@@ -493,6 +570,7 @@ function renderInvoices(){
 function renderWorkOrders(){
   $("#screen").innerHTML = `${pageHead("Work Orders","saveWO")}
     <section class="form-panel form-grid">
+      <div class="voice-fill-panel"><b>Speak Work Order</b><div class="voice-fill-row"><input id="woVoiceText" placeholder="Say complaint/cause/correction"><button class="voice-pill" id="speakWO">🎙 Speak</button><button class="voice-pill orange" id="voiceFillWO">Fill</button></div></div>
       <div class="two-col"><label>Customer<input id="woCustomer" value="${state.truck.customer || ""}"></label><label>Truck<input id="woTruck" value="${state.truck.unit || ""}"></label></div>
       <label>Complaint<textarea id="woComplaint"></textarea></label>
       <label>Cause<textarea id="woCause"></textarea></label>
@@ -501,12 +579,15 @@ function renderWorkOrders(){
       <div class="output">${state.workorders.map(w=>`${w.status}: ${w.customer} — ${w.desc}`).join("\n") || "No saved work orders."}</div>
     </section>`;
   bindPageTools();
+  if($("#speakWO")) $("#speakWO").onclick=()=>startVoiceToField("woVoiceText", spoken=>$("#woComplaint").value=professionalizeWorkText(spoken));
+  if($("#voiceFillWO")) $("#voiceFillWO").onclick=()=>{ $("#woComplaint").value=professionalizeWorkText($("#woVoiceText").value); toast("Work order filled"); };
   $("#saveWO").onclick=()=>{ state.workorders.push({customer:$("#woCustomer").value,truck:$("#woTruck").value,desc:$("#woComplaint").value,cause:$("#woCause").value,correction:$("#woCorrection").value,status:$("#woStatus").value,date:new Date().toLocaleString()}); saveState(); toast("Work order saved"); };
 }
 
 function renderSchedule(){
   $("#screen").innerHTML = `${pageHead("Schedule","saveSchedule")}
     <section class="form-panel form-grid">
+      <div class="voice-fill-panel"><b>Speak Schedule</b><div class="voice-fill-row"><input id="schedVoiceText" placeholder="Say job/customer/location/time notes"><button class="voice-pill" id="speakSchedule">🎙 Speak</button><button class="voice-pill orange" id="voiceFillSchedule">Fill</button></div></div>
       <div class="two-col"><label>Date<input id="schedDate" type="date"></label><label>Time<input id="schedTime" type="time"></label></div>
       <label>Customer<input id="schedCustomer" value="${state.truck.customer || ""}"></label>
       <label>Job<input id="schedJob" placeholder="PM, roadside, clutch, brakes..."></label>
@@ -516,6 +597,8 @@ function renderSchedule(){
       <div class="output">${state.schedule.map(x=>`${x.date || ""} ${x.time || ""} — ${x.customer || ""} — ${x.job || ""} — ${x.location || ""}`).join("\n") || "No saved schedule."}</div>
     </section>`;
   bindPageTools();
+  if($("#speakSchedule")) $("#speakSchedule").onclick=()=>startVoiceToField("schedVoiceText", spoken=>$("#schedJob").value=spoken);
+  if($("#voiceFillSchedule")) $("#voiceFillSchedule").onclick=()=>{ $("#schedJob").value=$("#schedVoiceText").value; toast("Schedule filled"); };
   $("#saveSchedule").onclick=()=>{ state.schedule.push({date:$("#schedDate").value,time:$("#schedTime").value,customer:$("#schedCustomer").value,job:$("#schedJob").value,location:$("#schedLocation").value,tech:$("#schedTech").value}); saveState(); toast("Schedule saved"); renderSchedule(); };
 }
 

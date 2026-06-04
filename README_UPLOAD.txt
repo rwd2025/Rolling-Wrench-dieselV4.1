@@ -45,3 +45,5 @@ V4.3 UPDATE:
 - Send button creates saved conversation messages.
 
 V4.4: upgraded Professional Invoice and Smart Quote screens with AI Fill, pro preview, line items, totals, print/PDF, convert quote to invoice, and price-variance disclaimer.
+
+V4.5: added speak-to-fill voice panels for Quotes, Invoices, Parts Lookup, Work Orders, and Schedule. Voice text can auto-fill labor, parts, and professional wording.
