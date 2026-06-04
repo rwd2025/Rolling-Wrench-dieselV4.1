@@ -47,3 +47,13 @@ V4.3 UPDATE:
 V4.4: upgraded Professional Invoice and Smart Quote screens with AI Fill, pro preview, line items, totals, print/PDF, convert quote to invoice, and price-variance disclaimer.
 
 V4.5: added speak-to-fill voice panels for Quotes, Invoices, Parts Lookup, Work Orders, and Schedule. Voice text can auto-fill labor, parts, and professional wording.
+
+V4.6 UPDATE:
+1. 3-job clock improved with send-to-work-order and send-to-invoice.
+2. AI chat kept and local AI routing helpers added.
+3. Customers upgraded into a linked customer database.
+4. Truck profiles upgraded into fleet truck list and active truck history.
+5. Supabase-ready settings added: URL, anon key, local sync test, status.
+6. OCR scanner workflow added for VIN, invoice/receipt, part labels, documents/fault screens.
+7. AI backend settings added for future endpoint/model connection.
+Sign-in remains last.

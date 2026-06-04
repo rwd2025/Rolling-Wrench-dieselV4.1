@@ -140,18 +140,21 @@ function recentRows(){
 }
 
 function renderClock(){
+  ensureV46();
   $("#screen").innerHTML = `${pageHead("3 Job Time Clock","saveAllClock",false)}
     <section class="summary-card">
       <div><span>Total Time</span><b id="clockTotalTime">${formatTime(totalSeconds())}</b></div>
       <div><span>Total Labor</span><b id="clockTotalMoney">${money(clockDollars(totalSeconds()))}</b></div>
       <div><span>Rate</span><b>${money(state.settings.laborRate)}/hr</b></div>
     </section>
+    <section class="backend-banner"><b>Invoice Ready Clock</b><small>Each job can be saved, cleared, and pushed into Work Orders / Invoices / Reports.</small></section>
     <section class="clock-page-grid">
       ${Object.entries(state.jobs).map(([id,j])=>jobClockCard(id,j)).join("")}
     </section>`;
   bindPageTools();
   $("#saveAllClock").onclick=()=>{ Object.entries(state.jobs).forEach(([id,j])=>saveClock(id,false)); saveState(); toast("All clocks saved"); renderClock(); };
 }
+
 function jobClockCard(id,j){
   return `<article class="job-clock-card">
     <div class="job-head"><h3>${j.name || id.toUpperCase()}</h3><span class="badge">${j.running ? "RUNNING" : (j.status || "READY")}</span></div>
@@ -167,6 +170,10 @@ function jobClockCard(id,j){
       <button class="stop" data-clock="stop" data-job="${id}">Stop</button>
       <button data-clock="save" data-job="${id}">Save</button>
       <button class="clear" data-clock="clear" data-job="${id}">Clear</button>
+    </div>
+    <div class="pro-actions" style="grid-template-columns:repeat(2,1fr);">
+      <button data-clock="toWO" data-job="${id}">Send to Work Order</button>
+      <button data-clock="toInvoice" data-job="${id}">Send to Invoice</button>
     </div>
   </article>`;
 }
@@ -187,12 +194,14 @@ function saveClock(id, show=true){
 }
 
 function renderTruck(){
+  ensureV46();
   const t=state.truck;
   $("#screen").innerHTML = `${pageHead("Truck Profile","saveTruck")}
     <section class="form-panel form-grid">
+      <div class="backend-banner"><b>Truck Profile</b><small>Active truck drives quotes, invoices, parts lookup, repair history, work orders, and schedule.</small></div>
       <div class="two-col">
         <label>Unit Number<input id="truckUnit" value="${t.unit || ""}"></label>
-        <label>Customer<input id="truckCustomer" value="${t.customer || ""}"></label>
+        <label>Customer<select id="truckCustomerSelect">${linkedCustomerOptions(t.customer)}</select></label>
       </div>
       <label>VIN<input id="truckVin" value="${t.vin || ""}" placeholder="Enter or scan VIN"></label>
       <div class="two-col">
@@ -203,10 +212,25 @@ function renderTruck(){
         <label>CPL<input id="truckCpl" value="${t.cpl || ""}"></label>
         <label>Mileage<input id="truckMileage" value="${t.mileage || ""}"></label>
       </div>
-      ${panelOutput("Active truck data follows parts, quotes, invoices, schedule, and work orders.")}
+      <button class="action-btn" data-route="camera">Scan VIN / Truck Photo</button>
+      <div class="section-title">Fleet Trucks</div>
+      <div>${state.trucks.length ? state.trucks.map((tr,i)=>`<div class="truck-row"><div><b>${tr.unit || "Truck"}</b><small>${tr.vin || "NO VIN"} • ${tr.customer || ""} • ${tr.engine || ""}</small></div><button data-load-truck="${i}">Set Active</button></div>`).join("") : `<div class="output">No saved fleet trucks.</div>`}</div>
+      <div class="section-title">Active Truck History</div>
+      <div class="output">${(state.trucks.find(x=>x.vin===t.vin)?.history || []).map(h=>`${h.date} — ${h.type}: ${h.text}`).join("\\n") || "No truck history yet."}</div>
     </section>`;
   bindPageTools();
-  $("#saveTruck").onclick=()=>{ state.truck={unit:$("#truckUnit").value,customer:$("#truckCustomer").value,vin:$("#truckVin").value,engine:$("#truckEngine").value,transmission:$("#truckTrans").value,cpl:$("#truckCpl").value,mileage:$("#truckMileage").value}; saveState(); toast("Truck saved"); renderTruck(); };
+  $("#saveTruck").onclick=()=>{ 
+    state.truck={unit:$("#truckUnit").value,customer:$("#truckCustomerSelect").value,vin:$("#truckVin").value,engine:$("#truckEngine").value,transmission:$("#truckTrans").value,cpl:$("#truckCpl").value,mileage:$("#truckMileage").value}; 
+    saveActiveTruckToFleet();
+    addTruckHistory("Truck Profile", "Profile updated");
+    saveState(); toast("Truck saved"); renderTruck(); 
+  };
+  $$("[data-load-truck]").forEach(btn=>btn.onclick=()=>{
+    state.truck = {...state.trucks[Number(btn.dataset.loadTruck)]};
+    saveState();
+    toast("Truck set active");
+    renderTruck();
+  });
 }
 
 function renderAi(){
@@ -532,7 +556,7 @@ function renderQuotes(){
   $("#aiBuildQuote").onclick=()=>{const job=v("quoteAiJob").toLowerCase();$("#quoteDesc").value=v("quoteAiJob");let hours=3.5,parts="Parts to verify by VIN / supplier",supplies=25;if(job.includes("water pump")){hours=3.5;parts="Water pump\\nGasket/seal kit\\nBelt if needed\\nCoolant\\nShop supplies";supplies=35}if(job.includes("clutch")){hours=11.5;parts="Clutch kit\\nPilot bearing\\nFlywheel resurface/replacement as needed\\nTransmission fluid if needed";supplies=45}if(job.includes("wheel seal")){hours=2.5;parts="Wheel seal\\nHub cap gasket\\nGear oil\\nBrake clean/shop supplies";supplies=25}if(job.includes("brake")){hours=3.0;parts="Brake parts as applicable\\nHardware kit\\nDrums/rotors if needed\\nShop supplies";supplies=25}$("#quoteHours").value=hours;$("#quotePartsList").value=parts;$("#quoteSupplies").value=supplies;$("#quotePartSource").value="Parts price/location to be verified before final approval";toast("AI quote filled");buildQuotePreview()};
   function buildQuotePreview(){const labor=n("quoteHours")*n("quoteRate");const subtotal=calc();const disclaimer="Estimate only. Final price may increase or decrease based on additional labor, seized/broken hardware, hidden damage, diagnostic findings, parts availability, freight, shop supplies, taxes/fees, travel, or extra time required to complete the repair. Customer approval required before additional work is performed. Parts pricing and availability may change until purchased.";$("#quotePreviewWrap").innerHTML=`<div class="pro-doc-preview"><div class="pro-doc-top"><div class="pro-doc-logo"><div class="doc-rw">RW</div><div><h3>${state.settings.shop || "Rolling Wrench Diesel"}</h3><p>${state.settings.phone || ""} • Mobile Diesel Repair</p></div></div><div class="doc-type"><b>Quote</b><small>${new Date().toLocaleDateString()}</small></div></div><div class="pro-info-grid"><div class="pro-info-box"><b>Customer</b><span>${v("quoteCustomer") || "Customer"}</span></div><div class="pro-info-box"><b>Truck / VIN</b><span>${v("quoteTruck") || "Truck / VIN"}</span></div><div class="pro-info-box"><b>Job</b><span>${v("quoteDesc") || "Repair estimate"}</span></div><div class="pro-info-box"><b>Parts Source</b><span>${v("quotePartSource") || "To be verified"}</span></div></div><table class="pro-table"><thead><tr><th>Description</th><th>Qty/Hours</th><th>Rate/Cost</th><th>Total</th></tr></thead><tbody><tr><td>Labor</td><td>${v("quoteHours")} hrs</td><td>${money(n("quoteRate"))}</td><td>${money(labor)}</td></tr><tr><td>Service Call</td><td>1</td><td>${money(n("quoteCall"))}</td><td>${money(n("quoteCall"))}</td></tr><tr><td>Travel / Mileage</td><td>1</td><td>${money(n("quoteTravel"))}</td><td>${money(n("quoteTravel"))}</td></tr><tr><td>Parts<br><small>${v("quotePartsList").replaceAll("\\n","<br>")}</small></td><td>1</td><td>${money(n("quoteParts"))}</td><td>${money(n("quoteParts"))}</td></tr><tr><td>Supplies / Fees / Misc</td><td>1</td><td>${money(n("quoteSupplies")+n("quoteFees")+n("quoteMisc"))}</td><td>${money(n("quoteSupplies")+n("quoteFees")+n("quoteMisc"))}</td></tr></tbody></table><div class="pro-total-box"><div class="pro-total-row"><span>Subtotal</span><b>${money(subtotal)}</b></div><div class="pro-total-row grand"><span>Estimated Total</span><b>${money(subtotal)}</b></div></div><div class="pro-note"><b>Estimate Disclaimer:</b> ${disclaimer}</div></div><div class="pro-actions"><button id="convertQuoteInvoice">Convert to Invoice</button><button id="saveQuoteAgain">Save Quote</button><button onclick="window.print()">Print / Save PDF</button></div>`;$("#saveQuoteAgain").onclick=()=>$("#saveQuote").click();$("#convertQuoteInvoice").onclick=()=>{state.invoices.push({customer:v("quoteCustomer"),truck:v("quoteTruck"),work:v("quoteDesc"),total:subtotal,date:new Date().toLocaleString(),fromQuote:true});saveState();toast("Converted to invoice")}}
   $("#previewQuote").onclick=buildQuotePreview;
-  $("#saveQuote").onclick=()=>{state.quotes.push({customer:v("quoteCustomer"),truck:v("quoteTruck"),desc:v("quoteDesc"),hours:n("quoteHours"),rate:n("quoteRate"),parts:v("quotePartsList"),source:v("quotePartSource"),total:calc(),date:new Date().toLocaleString()});saveState();toast("Quote saved")};
+  $("#saveQuote").onclick=()=>{state.quotes.push({customer:v("quoteCustomer"),truck:v("quoteTruck"),desc:v("quoteDesc"),hours:n("quoteHours"),rate:n("quoteRate"),parts:v("quotePartsList"),source:v("quotePartSource"),total:calc(),date:new Date().toLocaleString()});addTruckHistory("Quote", `${v("quoteDesc")} - ${money(calc())}`);saveState();toast("Quote saved")};
 }
 
 function renderInvoices(){
@@ -564,7 +588,7 @@ function renderInvoices(){
   const calc=()=> n("invHours")*n("invRate")+n("invCall")+n("invTravel")+n("invParts")+n("invSupplies")+n("invFees")-n("invDiscount");
   function buildInvoicePreview(){const labor=n("invHours")*n("invRate");const total=calc();$("#invoicePreviewWrap").innerHTML=`<div class="pro-doc-preview"><div class="pro-doc-top"><div class="pro-doc-logo"><div class="doc-rw">RW</div><div><h3>${state.settings.shop || "Rolling Wrench Diesel"}</h3><p>${state.settings.phone || ""} • Mobile Diesel & Equipment Repair</p></div></div><div class="doc-type"><b>Invoice</b><small>${new Date().toLocaleDateString()}<br>Due Upon Receipt</small></div></div><div class="pro-info-grid"><div class="pro-info-box"><b>Bill To</b><span>${v("invCustomer") || "Customer"}</span></div><div class="pro-info-box"><b>Truck / VIN</b><span>${v("invTruck") || "Truck / VIN"}</span></div><div class="pro-info-box"><b>Work Performed</b><span>${v("invWork") || "Work performed"}</span></div><div class="pro-info-box"><b>Payment</b><span>Due upon receipt unless otherwise agreed. Card processing fees may apply.</span></div></div><table class="pro-table"><thead><tr><th>Description</th><th>Qty/Hours</th><th>Rate/Cost</th><th>Total</th></tr></thead><tbody><tr><td>Labor</td><td>${v("invHours")} hrs</td><td>${money(n("invRate"))}</td><td>${money(labor)}</td></tr><tr><td>Service Call</td><td>1</td><td>${money(n("invCall"))}</td><td>${money(n("invCall"))}</td></tr><tr><td>Travel / Mileage</td><td>1</td><td>${money(n("invTravel"))}</td><td>${money(n("invTravel"))}</td></tr><tr><td>Parts / Materials<br><small>${v("invPartsList").replaceAll("\\n","<br>")}</small></td><td>1</td><td>${money(n("invParts"))}</td><td>${money(n("invParts"))}</td></tr><tr><td>Supplies / Tax / Fees</td><td>1</td><td>${money(n("invSupplies")+n("invFees"))}</td><td>${money(n("invSupplies")+n("invFees"))}</td></tr>${n("invDiscount") ? `<tr><td>Discount</td><td>1</td><td>-${money(n("invDiscount"))}</td><td>-${money(n("invDiscount"))}</td></tr>` : ""}</tbody></table><div class="pro-total-box"><div class="pro-total-row"><span>Subtotal</span><b>${money(total)}</b></div><div class="pro-total-row grand"><span>Total Due</span><b>${money(total)}</b></div></div><div class="pro-note"><b>Notes / Terms:</b> ${v("invNotes") || "Customer authorizes listed work. Additional issues found after teardown or diagnostics may require additional approval. Parts availability and pricing may vary. Payment due upon receipt."}</div></div><div class="pro-actions"><button id="saveInvoiceAgain">Save Invoice</button><button onclick="window.print()">Print / Save PDF</button><button id="textInvoice">Text/Share Ready</button></div>`;$("#saveInvoiceAgain").onclick=()=>$("#saveInvoice").click();$("#textInvoice").onclick=()=>toast("Use browser share/print or screenshot preview")}
   $("#previewInv").onclick=buildInvoicePreview;
-  $("#saveInvoice").onclick=()=>{state.invoices.push({customer:v("invCustomer"),truck:v("invTruck"),work:v("invWork"),parts:v("invPartsList"),notes:v("invNotes"),total:calc(),date:new Date().toLocaleString()});saveState();toast("Invoice saved")};
+  $("#saveInvoice").onclick=()=>{state.invoices.push({customer:v("invCustomer"),truck:v("invTruck"),work:v("invWork"),parts:v("invPartsList"),notes:v("invNotes"),total:calc(),date:new Date().toLocaleString()});addTruckHistory("Invoice", `${v("invWork")} - ${money(calc())}`);saveState();toast("Invoice saved")};
 }
 
 function renderWorkOrders(){
@@ -603,15 +627,30 @@ function renderSchedule(){
 }
 
 function renderCustomers(){
+  ensureV46();
   $("#screen").innerHTML = `${pageHead("Customers","saveCustomer")}
     <section class="form-panel form-grid">
+      <div class="backend-banner"><b>Customer Database</b><small>Customers link to trucks, quotes, invoices, work orders, schedule, and reports.</small></div>
       <label>Customer / Company<input id="custName"></label>
       <div class="two-col"><label>Phone<input id="custPhone"></label><label>Email<input id="custEmail"></label></div>
+      <label>Address / Location<input id="custAddress"></label>
       <label>Notes<textarea id="custNotes"></textarea></label>
-      <div class="output">${state.customers.map(c=>`${c.name} • ${c.phone} • ${c.email}`).join("\n") || "No saved customers."}</div>
+      <div class="section-title">Saved Customers</div>
+      <div>${state.customers.length ? state.customers.map((c,i)=>`<div class="customer-row"><div><b>${c.name}</b><small>${c.phone || ""} ${c.email || ""}<br>${c.address || ""}</small></div><button data-load-customer="${i}">Open</button></div>`).join("") : `<div class="output">No saved customers.</div>`}</div>
     </section>`;
   bindPageTools();
-  $("#saveCustomer").onclick=()=>{ state.customers.push({name:$("#custName").value,phone:$("#custPhone").value,email:$("#custEmail").value,notes:$("#custNotes").value}); saveState(); toast("Customer saved"); renderCustomers(); };
+  $("#saveCustomer").onclick=()=>{ 
+    state.customers.push({name:$("#custName").value,phone:$("#custPhone").value,email:$("#custEmail").value,address:$("#custAddress").value,notes:$("#custNotes").value,created:new Date().toLocaleString()}); 
+    saveState(); toast("Customer saved"); renderCustomers(); 
+  };
+  $$("[data-load-customer]").forEach(btn=>btn.onclick=()=>{
+    const c=state.customers[Number(btn.dataset.loadCustomer)];
+    if(!c) return;
+    state.truck.customer = c.name;
+    saveState();
+    toast("Customer set active");
+    renderCustomers();
+  });
 }
 
 function renderPinDrop(){
@@ -629,15 +668,34 @@ function renderPinDrop(){
 }
 
 function renderCamera(){
+  ensureV46();
   $("#screen").innerHTML = `${pageHead("Camera / OCR","saveCamera")}
     <section class="form-panel form-grid">
-      <p class="muted">Camera/OCR workflow shell for VIN, part label, fault screen, document, or truck photo.</p>
-      <label>Scan Notes<textarea id="cameraNotes"></textarea></label>
-      <button class="action-btn primary">Open Camera</button>
-      ${panelOutput("Browser camera permission required on HTTPS.")}
+      <div class="backend-banner"><b>OCR Scanner</b><small>Scan VIN plates, part labels, invoices, documents, fault screens, and repair photos. Local placeholder is ready; real OCR backend connects later.</small></div>
+      <input id="ocrFile" type="file" accept="image/*,.pdf" capture="environment">
+      <label>Scan Type<select id="ocrType"><option value="vin">VIN Plate</option><option value="part">Part Box / Label</option><option value="invoice">Invoice / Receipt</option><option value="doc">Document / Fault Screen</option></select></label>
+      <button class="action-btn primary" id="runOcr">Run OCR Scan</button>
+      <div class="scan-result" id="ocrResult">No scan yet.</div>
+      <div class="pro-actions">
+        <button id="ocrToTruck">Save to Truck</button>
+        <button id="ocrToParts">Save to Parts</button>
+        <button id="ocrToMemory">Save Memory</button>
+      </div>
     </section>`;
   bindPageTools();
-  $("#saveCamera").onclick=()=>{ state.notes.push({type:"Camera",note:$("#cameraNotes").value,date:new Date().toLocaleString()}); saveState(); toast("Camera note saved"); };
+  let lastResult = "";
+  $("#runOcr").onclick=()=>{
+    const f=$("#ocrFile").files[0];
+    lastResult = fakeOcrResult($("#ocrType").value, f?.name);
+    $("#ocrResult").textContent = lastResult;
+    state.ocrScans.unshift({type:$("#ocrType").value,result:lastResult,date:new Date().toLocaleString()});
+    saveState();
+    toast("OCR scan ready");
+  };
+  $("#ocrToTruck").onclick=()=>{ addTruckHistory("OCR", lastResult || $("#ocrResult").textContent); toast("OCR saved to truck"); };
+  $("#ocrToParts").onclick=()=>{ state.parts.push({query:"OCR Scan", notes:lastResult || $("#ocrResult").textContent}); saveState(); toast("OCR saved to parts"); };
+  $("#ocrToMemory").onclick=()=>{ state.notes.push({type:"OCR",note:lastResult || $("#ocrResult").textContent}); saveState(); toast("OCR saved to memory"); };
+  $("#saveCamera").onclick=()=>{ state.notes.push({type:"Camera/OCR",note:lastResult || $("#ocrResult").textContent,date:new Date().toLocaleString()}); saveState(); toast("Camera/OCR saved"); };
 }
 
 function renderMemory(){
@@ -693,18 +751,42 @@ Pins: ${state.pins.length}</div>
 }
 
 function renderSettings(){
+  ensureV46();
   const s=state.settings;
   $("#screen").innerHTML = `${pageHead("Settings","saveSettings")}
     <section class="form-panel form-grid">
+      <div class="backend-banner"><b>Backend Ready</b><small>Sign-in is still last. These settings prepare Supabase, AI endpoint, OCR, and sync.</small></div>
       <label>Shop Name<input id="setShop" value="${s.shop}"></label>
       <label>Phone<input id="setPhone" value="${s.phone}"></label>
       <div class="two-col"><label>Labor Rate<input id="setRate" type="number" value="${s.laborRate}"></label><label>Service Call<input id="setCall" type="number" value="${s.serviceCall}"></label></div>
       <div class="two-col"><label>Tax %<input id="setTax" type="number" value="${s.tax}"></label><label>Card Fee %<input id="setCard" type="number" value="${s.cardFee}"></label></div>
+
+      <div class="line-item-box form-grid">
+        <b>Supabase Sync</b>
+        <label>Supabase URL<input id="supabaseUrl" value="${state.supabase.url || ""}" placeholder="https://xxxxx.supabase.co"></label>
+        <label>Anon Key<input id="supabaseKey" value="${state.supabase.anonKey || ""}" placeholder="Paste anon public key later"></label>
+        <div class="sync-status"><i></i><span>Sync Status: ${state.supabase.enabled ? "Configured" : "Local Only"} • Last Sync: ${state.supabase.lastSync || "Never"}</span></div>
+        <button class="action-btn" id="testSync">Test Local Sync</button>
+      </div>
+
+      <div class="line-item-box form-grid">
+        <b>AI Backend</b>
+        <label>AI Endpoint<input id="aiEndpoint" value="${state.aiBackend.endpoint || ""}" placeholder="Backend AI endpoint later"></label>
+        <label>Model Name<input id="aiModel" value="${state.aiBackend.model || "Rolling Wrench AI Local"}"></label>
+        <div class="output">Current AI mode: ${state.aiBackend.enabled ? "Backend Ready" : "Local workflow only"}</div>
+      </div>
+
       <button class="action-btn clear" id="resetApp">Reset All Local Data</button>
     </section>`;
   bindPageTools();
-  $("#saveSettings").onclick=()=>{ state.settings={shop:$("#setShop").value,phone:$("#setPhone").value,laborRate:+$("#setRate").value||135,serviceCall:+$("#setCall").value||250,tax:+$("#setTax").value||0,cardFee:+$("#setCard").value||0}; saveState(); toast("Settings saved"); };
-  $("#resetApp").onclick=()=>{ if(confirm("Clear all local app data?")){ state=JSON.parse(JSON.stringify(defaultState)); saveState(); renderSettings(); toast("App reset"); }};
+  $("#saveSettings").onclick=()=>{ 
+    state.settings={shop:$("#setShop").value,phone:$("#setPhone").value,laborRate:+$("#setRate").value||135,serviceCall:+$("#setCall").value||250,tax:+$("#setTax").value||0,cardFee:+$("#setCard").value||0}; 
+    state.supabase={url:$("#supabaseUrl").value,anonKey:$("#supabaseKey").value,enabled:!!($("#supabaseUrl").value && $("#supabaseKey").value),lastSync:state.supabase.lastSync || "Never"};
+    state.aiBackend={endpoint:$("#aiEndpoint").value,model:$("#aiModel").value,enabled:!!$("#aiEndpoint").value};
+    saveState(); toast("Settings saved"); 
+  };
+  $("#testSync").onclick=()=>{ state.supabase.lastSync=new Date().toLocaleString(); saveState(); toast("Local sync test saved"); renderSettings(); };
+  $("#resetApp").onclick=()=>{ if(confirm("Clear all local app data?")){ localStorage.removeItem("RWD_V41_STATE"); location.reload(); }};
 }
 
 function renderRepair(){
@@ -747,6 +829,63 @@ function renderAlerts(){
   bindPageTools();
 }
 
+
+function ensureV46(){
+  if(!state.trucks) state.trucks = [];
+  if(!state.customerTrucks) state.customerTrucks = {};
+  if(!state.supabase) state.supabase = {url:"", anonKey:"", enabled:false, lastSync:"Never"};
+  if(!state.ocrScans) state.ocrScans = [];
+  if(!state.aiBackend) state.aiBackend = {endpoint:"", enabled:false, model:"Rolling Wrench AI Local"};
+  if(!state.alerts) state.alerts = [];
+}
+ensureV46();
+
+function addAlert(title, body){
+  ensureV46();
+  state.alerts.unshift({title, body, date:new Date().toLocaleString(), read:false});
+  saveState();
+  const badge=document.getElementById("alertCount");
+  if(badge) badge.textContent = state.alerts.filter(a=>!a.read).length;
+}
+function linkedCustomerOptions(selected=""){
+  const customers = state.customers || [];
+  return `<option value="">Select customer</option>` + customers.map(c=>`<option ${c.name===selected?'selected':''}>${c.name}</option>`).join("");
+}
+function saveActiveTruckToFleet(){
+  ensureV46();
+  const exists = state.trucks.find(t=>t.vin && t.vin===state.truck.vin);
+  if(exists) Object.assign(exists, state.truck);
+  else state.trucks.unshift({...state.truck, id:Date.now().toString(), history:[]});
+  saveState();
+}
+function addTruckHistory(type, text){
+  ensureV46();
+  const vin = state.truck.vin || "NO VIN";
+  let truck = state.trucks.find(t=>t.vin===vin);
+  if(!truck){
+    truck = {...state.truck, id:Date.now().toString(), history:[]};
+    state.trucks.unshift(truck);
+  }
+  if(!truck.history) truck.history=[];
+  truck.history.unshift({type, text, date:new Date().toLocaleString()});
+  saveState();
+}
+function fakeOcrResult(kind, fileName){
+  if(kind==="vin") return `VIN OCR RESULT\\nVIN: UNKNOWN - VERIFY MANUALLY\\nAction: Save to Truck Profile after confirmation.\\nFile: ${fileName || "camera image"}`;
+  if(kind==="invoice") return `INVOICE OCR RESULT\\nCustomer: UNKNOWN\\nLabor/parts lines need review.\\nAction: Send to Invoice module.\\nFile: ${fileName || "document"}`;
+  if(kind==="part") return `PART LABEL OCR RESULT\\nPart Number: UNKNOWN - VERIFY\\nBrand/Supplier: UNKNOWN\\nAction: Send to Parts Lookup.\\nFile: ${fileName || "part image"}`;
+  return `DOCUMENT OCR RESULT\\nText extraction placeholder ready.\\nAction: Save to Repair Memory / Work Order.\\nFile: ${fileName || "file"}`;
+}
+function localAiAnswer(q){
+  q=(q||"").toLowerCase();
+  if(q.includes("quote")) return "Quote workflow: I can use labor rate, estimated time, service call, parts list, supplies, and disclaimer. Save to Smart Quotes when reviewed.";
+  if(q.includes("invoice")) return "Invoice workflow: I can professionalize work performed, add line items, calculate totals, and save to Invoices.";
+  if(q.includes("part") || q.includes("water pump") || q.includes("belt")) return "Parts workflow: identify likely part category, require VIN/OEM/supplier verification, then save to Parts Lookup.";
+  if(q.includes("vin")) return "VIN workflow: scan/read VIN, confirm manually, then save to Truck Profile and active truck.";
+  if(q.includes("spn") || q.includes("fmi") || q.includes("fault")) return "Fault workflow: open Fault Doctor, document active/inactive status, wiring checks, live data, mechanical checks, and final repair.";
+  return localAiAnswer(q);
+}
+
 const routes = {
   home:renderHome, clock:renderClock, truck:renderTruck, ai:renderAi, parts:renderParts, fault:renderFault,
   repairhud:renderRepairHud, quotes:renderQuotes, invoices:renderInvoices, workorders:renderWorkOrders,
@@ -770,6 +909,16 @@ document.addEventListener("click", e=>{
     if(action==="stop"){ j.running=false; j.status="STOPPED"; }
     if(action==="clear"){ j.running=false; j.seconds=0; j.status="READY"; }
     if(action==="save"){ saveClock(id); }
+    if(action==="toWO"){ 
+      state.workorders.push({customer:j.customer || state.truck.customer, truck:state.truck.unit, desc:`${j.name} - clock labor ${formatTime(j.seconds)}`, status:"Open", clockSeconds:j.seconds, date:new Date().toLocaleString()});
+      addTruckHistory("Clock to Work Order", `${j.name} ${formatTime(j.seconds)}`);
+      toast("Clock sent to work order");
+    }
+    if(action==="toInvoice"){
+      state.invoices.push({customer:j.customer || state.truck.customer, truck:state.truck.unit, work:`${j.name} - labor time ${formatTime(j.seconds)}`, total:clockDollars(j.seconds), clockSeconds:j.seconds, date:new Date().toLocaleString()});
+      addTruckHistory("Clock to Invoice", `${j.name} ${formatTime(j.seconds)} ${money(clockDollars(j.seconds))}`);
+      toast("Clock sent to invoice");
+    }
     saveState(); renderClock(); return;
   }
 });
@@ -779,9 +928,13 @@ setInterval(()=>{
   Object.values(state.jobs).forEach(j=>{ if(j.running){ j.seconds++; changed=true; }});
   if(changed){
     saveState();
-    if(currentRoute()==="home" || currentRoute()==="clock") render(currentRoute());
+    if(currentRoute()==="home" || currentRoute()==="clock") ensureV46();
+if(document.getElementById('alertCount')) document.getElementById('alertCount').textContent = (state.alerts||[]).filter(a=>!a.read).length;
+render(currentRoute());
   }
 },1000);
 
+ensureV46();
+if(document.getElementById('alertCount')) document.getElementById('alertCount').textContent = (state.alerts||[]).filter(a=>!a.read).length;
 render(currentRoute());
 if("serviceWorker" in navigator){navigator.serviceWorker.register("./service-worker.js").catch(()=>{});}
