@@ -59,3 +59,10 @@ V4.6 UPDATE:
 Sign-in remains last.
 
 V4.7: Added customer/driver signature pads for Quotes and Invoices. Works with touch, finger, stylus, mouse on iPhone, Android, tablet, and desktop. Signatures save into preview and records.
+
+V4.8 UPDATE:
+- Full Settings Control Center added.
+- Theme Manager, Employee Manager, Pricing Manager, Alert Manager, Sound Manager, Display Manager, AI Settings, OCR Settings, Cloud/Backup, and Security placeholders.
+- Export customers/trucks/quotes/invoices/all data as JSON.
+- Restore database from JSON.
+- Theme and display options apply immediately.

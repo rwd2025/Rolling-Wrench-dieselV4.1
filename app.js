@@ -858,43 +858,181 @@ Pins: ${state.pins.length}</div>
   bindPageTools();
 }
 
-function renderSettings(){
+function renderSettings(tab="main"){
   ensureV46();
+  ensureSettingsV48();
   const s=state.settings;
-  $("#screen").innerHTML = `${pageHead("Settings","saveSettings")}
-    <section class="form-panel form-grid">
-      <div class="backend-banner"><b>Backend Ready</b><small>Sign-in is still last. These settings prepare Supabase, AI endpoint, OCR, and sync.</small></div>
+  const p=state.pricing;
+  let content = "";
+
+  if(tab==="main"){
+    content = `<section class="settings-section form-grid">
+      <h3>Shop Information</h3>
       <label>Shop Name<input id="setShop" value="${s.shop}"></label>
-      <label>Phone<input id="setPhone" value="${s.phone}"></label>
-      <div class="two-col"><label>Labor Rate<input id="setRate" type="number" value="${s.laborRate}"></label><label>Service Call<input id="setCall" type="number" value="${s.serviceCall}"></label></div>
-      <div class="two-col"><label>Tax %<input id="setTax" type="number" value="${s.tax}"></label><label>Card Fee %<input id="setCard" type="number" value="${s.cardFee}"></label></div>
-
-      <div class="line-item-box form-grid">
-        <b>Supabase Sync</b>
-        <label>Supabase URL<input id="supabaseUrl" value="${state.supabase.url || ""}" placeholder="https://xxxxx.supabase.co"></label>
-        <label>Anon Key<input id="supabaseKey" value="${state.supabase.anonKey || ""}" placeholder="Paste anon public key later"></label>
-        <div class="sync-status"><i></i><span>Sync Status: ${state.supabase.enabled ? "Configured" : "Local Only"} • Last Sync: ${state.supabase.lastSync || "Never"}</span></div>
-        <button class="action-btn" id="testSync">Test Local Sync</button>
-      </div>
-
-      <div class="line-item-box form-grid">
-        <b>AI Backend</b>
-        <label>AI Endpoint<input id="aiEndpoint" value="${state.aiBackend.endpoint || ""}" placeholder="Backend AI endpoint later"></label>
-        <label>Model Name<input id="aiModel" value="${state.aiBackend.model || "Rolling Wrench AI Local"}"></label>
-        <div class="output">Current AI mode: ${state.aiBackend.enabled ? "Backend Ready" : "Local workflow only"}</div>
-      </div>
-
-      <button class="action-btn clear" id="resetApp">Reset All Local Data</button>
+      <label>DBA / Display Name<input id="setDba" value="${s.dba || s.shop || ""}"></label>
+      <div class="two-col"><label>Phone<input id="setPhone" value="${s.phone}"></label><label>Email<input id="setEmail" value="${s.email || ""}"></label></div>
+      <label>Website<input id="setWebsite" value="${s.website || "www.rollingwrenchdiesel.com"}"></label>
+      <label>Address<input id="setAddress" value="${s.address || ""}"></label>
+      <div class="two-col"><label>DOT Number<input id="setDot" value="${s.dot || ""}"></label><label>Tax ID<input id="setTaxId" value="${s.taxId || ""}"></label></div>
     </section>`;
+  }
+
+  if(tab==="themes"){
+    const themes=[["orange","Rolling Wrench Orange","Graphite + orange"],["green","Night Ops Green","Dark + green"],["blue","Steel Blue","Fleet blue"],["red","Snap-On Red","Red shop style"],["gray","Fleet Gray","Clean gray"],["light","Light Mode","Bright office"]];
+    content = `<section class="settings-section"><h3>Theme Manager</h3><div class="theme-grid">${themes.map(t=>`<button class="theme-card ${state.ui.theme===t[0]?'active':''}" data-theme="${t[0]}"><b>${t[1]}</b><small>${t[2]}</small></button>`).join("")}</div></section>
+    <section class="settings-section form-grid"><h3>Background Style</h3><label>Background<select id="setBackground"><option ${state.ui.background==="diamond"?"selected":""}>diamond</option><option ${state.ui.background==="carbon"?"selected":""}>carbon</option><option ${state.ui.background==="steel"?"selected":""}>steel</option><option ${state.ui.background==="plain"?"selected":""}>plain</option></select></label></section>`;
+  }
+
+  if(tab==="pricing"){
+    content = `<section class="settings-section form-grid"><h3>Pricing Manager</h3>
+      <div class="two-col"><label>Shop Labor<input id="shopLabor" type="number" value="${p.shopLabor}"></label><label>Mobile Labor<input id="mobileLabor" type="number" value="${p.mobileLabor}"></label></div>
+      <div class="two-col"><label>Diagnostic Rate<input id="diagnosticRate" type="number" value="${p.diagnostic}"></label><label>Roadside Rate<input id="roadsideRate" type="number" value="${p.roadside}"></label></div>
+      <div class="two-col"><label>Service Call<input id="serviceCall2" type="number" value="${p.serviceCall}"></label><label>Mileage Rate<input id="mileageRate" type="number" step=".01" value="${p.mileage}"></label></div>
+      <div class="two-col"><label>Shop Supplies %<input id="suppliesPct" type="number" step=".1" value="${p.shopSuppliesPct}"></label><label>Environmental Fee<input id="envFee" type="number" step=".01" value="${p.envFee}"></label></div>
+      <div class="two-col"><label>Card Processing %<input id="cardPct" type="number" step=".1" value="${p.cardPct}"></label><label>Tax %<input id="taxPct" type="number" step=".1" value="${p.taxPct}"></label></div>
+      <div class="two-col"><label>After Hours Multiplier<input id="afterHoursMult" type="number" step=".1" value="${p.afterHoursMultiplier}"></label><label>Weekend Multiplier<input id="weekendMult" type="number" step=".1" value="${p.weekendMultiplier}"></label></div>
+      <label>Holiday Multiplier<input id="holidayMult" type="number" step=".1" value="${p.holidayMultiplier}"></label>
+    </section>`;
+  }
+
+  if(tab==="employees"){
+    content = `<section class="settings-section form-grid"><h3>Employee Manager</h3>
+      <div class="two-col"><label>Name<input id="empName" placeholder="Employee name"></label><label>Position<input id="empRole" placeholder="Tech / Manager / Admin"></label></div>
+      <div class="two-col"><label>Phone<input id="empPhone"></label><label>Email<input id="empEmail"></label></div>
+      <div class="two-col"><label>Pay Rate<input id="empPay"></label><label>Billable Labor Rate<input id="empLabor" value="${s.laborRate || 135}"></label></div>
+      <button class="action-btn primary" id="addEmployee">Add Employee</button>
+      <div>${state.employees.map((e,i)=>`<div class="employee-card"><div><b>${e.name}</b><small>${e.role} • Labor ${money(e.laborRate || 0)}<br>${e.phone || ""} ${e.email || ""}</small></div><button data-remove-emp="${i}">Remove</button></div>`).join("")}</div>
+    </section>`;
+  }
+
+  if(tab==="alerts"){
+    content = `<section class="settings-section"><h3>Alert Manager</h3>
+      ${toggleBtn("alertSettings.pm","PM Due Alerts","Maintenance reminders")}
+      ${toggleBtn("alertSettings.schedule","Schedule Alerts","Upcoming jobs")}
+      ${toggleBtn("alertSettings.invoice","Invoice Due Alerts","Unpaid invoice reminders")}
+      ${toggleBtn("alertSettings.quote","Quote Follow-Up Alerts","Estimate follow-up reminders")}
+      ${toggleBtn("alertSettings.clock","Employee Clock Alerts","Running too long / clock reminders")}
+      ${toggleBtn("alertSettings.truck","Truck Service Alerts","Service due and history alerts")}
+    </section>`;
+  }
+
+  if(tab==="sounds"){
+    content = `<section class="settings-section"><h3>Sound Manager</h3>
+      ${toggleBtn("soundSettings.button","Button Click","Tap sounds")}
+      ${toggleBtn("soundSettings.save","Save Confirmation","Sound when saved")}
+      ${toggleBtn("soundSettings.aiVoice","AI Voice","Voice playback")}
+      ${toggleBtn("soundSettings.notification","Notification Sound","Alert sound")}
+      ${toggleBtn("soundSettings.clockIn","Clock In Sound","Start clock sound")}
+      ${toggleBtn("soundSettings.clockOut","Clock Out Sound","Stop clock sound")}
+      <div class="range-row"><label>Volume<input id="soundVolume" type="range" min="0" max="100" value="${state.soundSettings.volume}"></label><b>${state.soundSettings.volume}%</b></div>
+    </section>`;
+  }
+
+  if(tab==="display"){
+    content = `<section class="settings-section"><h3>Display Settings</h3>
+      ${toggleBtn("ui.compact","Compact Mode","Fit more on mobile screen")}
+      ${toggleBtn("ui.largeText","Large Text","Bigger labels and buttons")}
+      ${toggleBtn("ui.highContrast","High Contrast","Brighter borders and text")}
+      ${toggleBtn("ui.showEarnings","Show Earnings Card","Dashboard finance card")}
+      ${toggleBtn("ui.showSchedule","Show Schedule Card","Dashboard schedule card")}
+      ${toggleBtn("ui.showRecentJobs","Show Recent Jobs","Dashboard recent jobs")}
+      ${toggleBtn("ui.showSystemStatus","Show System Status","GPS/camera/storage status")}
+    </section>`;
+  }
+
+  if(tab==="ai"){
+    content = `<section class="settings-section form-grid"><h3>Rolling Wrench AI Settings</h3>
+      ${toggleBtn("aiSettings.voice","AI Voice On/Off","Talk back responses")}
+      <label>Voice Speed<input id="aiVoiceSpeed" type="number" step=".1" value="${state.aiSettings.voiceSpeed}"></label>
+      <label>Voice Type<select id="aiVoiceType"><option ${state.aiSettings.voiceType==="Shop Pro"?"selected":""}>Shop Pro</option><option ${state.aiSettings.voiceType==="Calm Tech"?"selected":""}>Calm Tech</option><option ${state.aiSettings.voiceType==="Fast Dispatcher"?"selected":""}>Fast Dispatcher</option></select></label>
+      ${toggleBtn("aiSettings.autoRead","Auto Read Answers","Read AI answers out loud")}
+      ${toggleBtn("aiSettings.saveConversations","Save Conversations","Keep chat history")}
+      ${toggleBtn("aiSettings.rememberTruck","Remember Active Truck","Use current truck context")}
+      ${toggleBtn("aiSettings.rememberCustomer","Remember Customer","Use customer context")}
+    </section>`;
+  }
+
+  if(tab==="ocr"){
+    content = `<section class="settings-section"><h3>OCR Settings</h3>
+      ${toggleBtn("ocrSettings.autoOcr","Auto OCR","Automatically scan uploaded images")}
+      ${toggleBtn("ocrSettings.vin","VIN Recognition","Read VIN plates")}
+      ${toggleBtn("ocrSettings.part","Part Label Recognition","Read part boxes/labels")}
+      ${toggleBtn("ocrSettings.invoice","Invoice Recognition","Read invoices/receipts")}
+      ${toggleBtn("ocrSettings.fault","Fault Screen Recognition","Read screenshots/scanner screens")}
+    </section>`;
+  }
+
+  if(tab==="cloud"){
+    content = `<section class="settings-section form-grid"><h3>Data & Sync</h3>
+      <label>Supabase URL<input id="supabaseUrl" value="${state.supabase?.url || ""}" placeholder="https://xxxxx.supabase.co"></label>
+      <label>Anon Key<input id="supabaseKey" value="${state.supabase?.anonKey || ""}" placeholder="Paste anon public key later"></label>
+      <div class="sync-status"><i></i><span>Supabase Status: ${state.supabase?.enabled ? "Configured" : "Local Only"} • Last Sync: ${state.supabase?.lastSync || "Never"}</span></div>
+      <div class="export-grid">
+        <button data-export="all">Backup Database</button>
+        <button id="restoreData">Restore Database</button>
+        <button data-export="customers">Export Customers</button>
+        <button data-export="trucks">Export Trucks</button>
+        <button data-export="quotes">Export Quotes</button>
+        <button data-export="invoices">Export Invoices</button>
+      </div>
+      <input id="restoreFile" type="file" accept="application/json" hidden>
+    </section>`;
+  }
+
+  if(tab==="security"){
+    content = `<section class="settings-section form-grid"><h3>Security</h3>
+      ${toggleBtn("security.appLock","App Lock On/Off","Require PIN before opening app")}
+      <label>PIN Code<input id="securityPin" type="password" value="${state.security.pin || ""}" placeholder="Set PIN"></label>
+      ${toggleBtn("security.faceId","Face ID","Placeholder until native wrapper/sign-in")}
+      ${toggleBtn("security.touchId","Touch ID","Placeholder until native wrapper/sign-in")}
+      <div class="output">Security options are local placeholders until sign-in/user roles are added.</div>
+    </section>`;
+  }
+
+  $("#screen").innerHTML = `${pageHead("Settings","saveSettings")}${settingsTabButtons(tab)}${content}`;
   bindPageTools();
+  bindSettingsToggles();
+  $$("[data-settings-tab]").forEach(b=>b.onclick=()=>renderSettings(b.dataset.settingsTab));
+
   $("#saveSettings").onclick=()=>{ 
-    state.settings={shop:$("#setShop").value,phone:$("#setPhone").value,laborRate:+$("#setRate").value||135,serviceCall:+$("#setCall").value||250,tax:+$("#setTax").value||0,cardFee:+$("#setCard").value||0}; 
-    state.supabase={url:$("#supabaseUrl").value,anonKey:$("#supabaseKey").value,enabled:!!($("#supabaseUrl").value && $("#supabaseKey").value),lastSync:state.supabase.lastSync || "Never"};
-    state.aiBackend={endpoint:$("#aiEndpoint").value,model:$("#aiModel").value,enabled:!!$("#aiEndpoint").value};
-    saveState(); toast("Settings saved"); 
+    if($("#setShop")) state.settings.shop=$("#setShop").value;
+    if($("#setDba")) state.settings.dba=$("#setDba").value;
+    if($("#setPhone")) state.settings.phone=$("#setPhone").value;
+    if($("#setEmail")) state.settings.email=$("#setEmail").value;
+    if($("#setWebsite")) state.settings.website=$("#setWebsite").value;
+    if($("#setAddress")) state.settings.address=$("#setAddress").value;
+    if($("#setDot")) state.settings.dot=$("#setDot").value;
+    if($("#setTaxId")) state.settings.taxId=$("#setTaxId").value;
+
+    if($("#shopLabor")){
+      state.pricing={shopLabor:+$("#shopLabor").value||135,mobileLabor:+$("#mobileLabor").value||135,diagnostic:+$("#diagnosticRate").value||150,roadside:+$("#roadsideRate").value||150,serviceCall:+$("#serviceCall2").value||250,mileage:+$("#mileageRate").value||0,shopSuppliesPct:+$("#suppliesPct").value||0,envFee:+$("#envFee").value||0,cardPct:+$("#cardPct").value||0,taxPct:+$("#taxPct").value||0,afterHoursMultiplier:+$("#afterHoursMult").value||1.5,weekendMultiplier:+$("#weekendMult").value||1.5,holidayMultiplier:+$("#holidayMult").value||2};
+      state.settings.laborRate=state.pricing.mobileLabor;
+      state.settings.serviceCall=state.pricing.serviceCall;
+    }
+
+    if($("#setBackground")) state.ui.background=$("#setBackground").value;
+    if($("#soundVolume")) state.soundSettings.volume=+$("#soundVolume").value;
+    if($("#aiVoiceSpeed")) state.aiSettings.voiceSpeed=+$("#aiVoiceSpeed").value || 1;
+    if($("#aiVoiceType")) state.aiSettings.voiceType=$("#aiVoiceType").value;
+    if($("#securityPin")) state.security.pin=$("#securityPin").value;
+    if($("#supabaseUrl")) state.supabase={url:$("#supabaseUrl").value,anonKey:$("#supabaseKey").value,enabled:!!($("#supabaseUrl").value&&$("#supabaseKey").value),lastSync:new Date().toLocaleString()};
+
+    saveState(); applyUiSettings(); toast("Settings saved"); 
   };
-  $("#testSync").onclick=()=>{ state.supabase.lastSync=new Date().toLocaleString(); saveState(); toast("Local sync test saved"); renderSettings(); };
-  $("#resetApp").onclick=()=>{ if(confirm("Clear all local app data?")){ localStorage.removeItem("RWD_V41_STATE"); location.reload(); }};
+
+  if($("#addEmployee")) $("#addEmployee").onclick=()=>{
+    state.employees.push({name:$("#empName").value,role:$("#empRole").value,phone:$("#empPhone").value,email:$("#empEmail").value,payRate:$("#empPay").value,laborRate:+$("#empLabor").value||state.settings.laborRate,admin:false,clock:true,schedule:true,invoice:false});
+    saveState(); toast("Employee added"); renderSettings("employees");
+  };
+  $$("[data-remove-emp]").forEach(b=>b.onclick=()=>{state.employees.splice(+b.dataset.removeEmp,1);saveState();renderSettings("employees");});
+  $$("[data-export]").forEach(b=>b.onclick=()=>exportJson(b.dataset.export));
+  if($("#restoreData")) $("#restoreData").onclick=()=>$("#restoreFile").click();
+  if($("#restoreFile")) $("#restoreFile").onchange=e=>{
+    const f=e.target.files[0]; if(!f) return;
+    const r=new FileReader();
+    r.onload=()=>{ try{ const data=JSON.parse(r.result); if(data.settings) state=data; saveState(); toast("Database restored"); renderSettings("cloud"); }catch(err){toast("Restore failed");} };
+    r.readAsText(f);
+  };
 }
 
 function renderRepair(){
@@ -1037,12 +1175,16 @@ setInterval(()=>{
   if(changed){
     saveState();
     if(currentRoute()==="home" || currentRoute()==="clock") ensureV46();
+ensureSettingsV48();
+applyUiSettings();
 if(document.getElementById('alertCount')) document.getElementById('alertCount').textContent = (state.alerts||[]).filter(a=>!a.read).length;
 render(currentRoute());
   }
 },1000);
 
 ensureV46();
+ensureSettingsV48();
+applyUiSettings();
 if(document.getElementById('alertCount')) document.getElementById('alertCount').textContent = (state.alerts||[]).filter(a=>!a.read).length;
 render(currentRoute());
 if("serviceWorker" in navigator){navigator.serviceWorker.register("./service-worker.js").catch(()=>{});}
