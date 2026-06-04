@@ -87,17 +87,18 @@ function renderHome(){
       </article>
     </section>
 
-    <button class="rwd-ai-bar" data-route="ai">
+    <div class="rwd-ai-bar" data-route="ai">
       <div class="ai-orb">RW</div>
       <div class="ai-copy">
         <strong>Ask Rolling Wrench AI</strong>
-        <span>VIN • Parts • Faults • Quotes • Invoices • Procedures • Work Orders</span>
+        <span>+ photos/files • voice • camera • VIN • parts • invoices • documents</span>
       </div>
       <div class="ai-tools">
+        <button type="button" data-route="ai">＋</button>
         <button type="button" data-route="ai">🎙</button>
         <button type="button" data-route="camera">📷</button>
       </div>
-    </button>
+    </div>
 
     <section class="module-grid">
       ${modules.map(m=>`<button class="module-card" data-route="${m[0]}"><span class="icon">${m[1]}</span><b>${m[2]}</b><small>${m[3]}</small></button>`).join("")}
@@ -210,26 +211,118 @@ function renderTruck(){
 
 function renderAi(){
   $("#screen").innerHTML = `${pageHead("Rolling Wrench AI","saveAi")}
-    <section class="form-panel form-grid">
-      <label>Ask Anything<textarea id="aiAsk" placeholder="VIN, parts, fault code, quote, invoice, work order, schedule, procedure..."></textarea></label>
-      <button class="action-btn primary" id="aiRun">Ask / Route</button>
-      <div class="output" id="aiOut">Rolling Wrench AI command screen. It routes your question to the correct module.</div>
+    <section class="v42-ai-page">
+      <div class="ai-chat-shell">
+        <div class="ai-chat-header">
+          <div class="ai-orb">RW</div>
+          <div>
+            <h3>Ask Rolling Wrench AI</h3>
+            <p>Voice • camera • photos • files • documents • shop workflow</p>
+          </div>
+          <div class="voice-status"><i class="voice-dot"></i><span id="voiceState">Ready</span></div>
+        </div>
+
+        <div class="ai-attach-grid">
+          <button class="ai-attach" id="attachPhoto"><span>🖼</span><b>Add Photo</b></button>
+          <button class="ai-attach" id="takePicture"><span>📷</span><b>Take Picture</b></button>
+          <button class="ai-attach" id="scanDoc"><span>📄</span><b>Scan Document</b></button>
+          <button class="ai-attach" id="scanInvoice"><span>🧾</span><b>Scan Invoice</b></button>
+          <button class="ai-attach" id="scanPart"><span>📦</span><b>Part Box / Label</b></button>
+          <button class="ai-attach" id="scanVin"><span>🚚</span><b>VIN Plate</b></button>
+        </div>
+
+        <input id="aiFileInput" type="file" accept="image/*,.pdf,.txt,.csv,.doc,.docx,.xlsx" multiple hidden>
+        <input id="aiCameraInput" type="file" accept="image/*" capture="environment" hidden>
+
+        <div class="ai-composer">
+          <button id="plusAttach" title="Add file">＋</button>
+          <textarea id="aiAsk" placeholder="Ask anything... Example: identify this part, build invoice, decode VIN, SPN 3251 FMI 2, create work order..."></textarea>
+          <button id="voiceBtn" title="Voice">🎙</button>
+          <button id="sendAi" class="hide-small" title="Send">➤</button>
+        </div>
+
+        <div class="ai-response" id="aiOut">Attach a photo, scan a document, use voice, or type a question. Rolling Wrench AI will route it to Truck, Parts, Fault Doctor, Quotes, Invoices, Work Orders, Schedule, Pin Drop, or Repair Memory.</div>
+
+        <div class="ai-save-grid">
+          <button data-save-ai="truck">Save to Truck</button>
+          <button data-save-ai="parts">Save to Parts</button>
+          <button data-save-ai="workorders">Save Work Order</button>
+          <button data-save-ai="quotes">Save Quote</button>
+          <button data-save-ai="invoices">Save Invoice</button>
+          <button data-save-ai="memory">Save Memory</button>
+        </div>
+      </div>
     </section>`;
   bindPageTools();
-  $("#aiRun").onclick=()=>{
-    const q=$("#aiAsk").value.toLowerCase();
-    let dest="repairhud";
-    if(q.includes("invoice")) dest="invoices";
-    else if(q.includes("quote")) dest="quotes";
-    else if(q.includes("work order")) dest="workorders";
-    else if(q.includes("part") || q.includes("water pump") || q.includes("belt")) dest="parts";
-    else if(q.includes("vin") || q.includes("truck")) dest="truck";
-    else if(q.includes("schedule")) dest="schedule";
-    else if(q.includes("pin") || q.includes("gps") || q.includes("location")) dest="pindrop";
-    else if(q.includes("fault") || q.includes("spn") || q.includes("fmi")) dest="fault";
-    $("#aiOut").textContent = `Recommended module: ${dest.toUpperCase()}\n\nUse the Save button to keep this AI note, or open the module from Home.`;
+
+  const fileInput = $("#aiFileInput");
+  const camInput = $("#aiCameraInput");
+  const attach = label => {
+    fileInput.click();
+    $("#aiOut").textContent = `${label} selected.\n\nAfter upload/scan, Rolling Wrench AI will read it and route it to the correct module.`;
   };
-  $("#saveAi").onclick=()=>{ state.notes.push({type:"AI",note:$("#aiAsk").value,date:new Date().toLocaleString()}); saveState(); toast("AI note saved"); };
+
+  $("#plusAttach").onclick=()=>attach("Add file/photo/document");
+  $("#attachPhoto").onclick=()=>attach("Photo");
+  $("#scanDoc").onclick=()=>attach("Document");
+  $("#scanInvoice").onclick=()=>attach("Invoice");
+  $("#takePicture").onclick=()=>camInput.click();
+  $("#scanPart").onclick=()=>camInput.click();
+  $("#scanVin").onclick=()=>camInput.click();
+
+  fileInput.onchange=()=>{
+    const names=[...fileInput.files].map(f=>f.name).join(", ");
+    $("#aiOut").textContent=`Attached: ${names}\n\nAsk what you want me to do with it: identify part, read invoice, decode VIN, build quote, save to job, or create work order.`;
+  };
+  camInput.onchange=()=>{
+    const name=camInput.files[0]?.name || "camera photo";
+    $("#aiOut").textContent=`Captured: ${name}\n\nTell Rolling Wrench AI what this is: VIN plate, part box, fault screen, invoice, damaged part, or document.`;
+  };
+
+  $("#voiceBtn").onclick=()=>{
+    const supported = "webkitSpeechRecognition" in window || "SpeechRecognition" in window;
+    if(!supported){
+      $("#voiceState").textContent="Voice Text";
+      $("#aiOut").textContent="Voice recognition is not available in this browser yet. Tap the text box and use your phone keyboard microphone for now.";
+      return;
+    }
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const rec = new SR();
+    rec.lang="en-US"; rec.interimResults=false; rec.maxAlternatives=1;
+    $("#voiceState").textContent="Listening";
+    rec.onresult=e=>{ $("#aiAsk").value=e.results[0][0].transcript; $("#voiceState").textContent="Ready"; runAiCommand(); };
+    rec.onerror=()=>{ $("#voiceState").textContent="Ready"; toast("Voice stopped"); };
+    rec.onend=()=>$("#voiceState").textContent="Ready";
+    rec.start();
+  };
+
+  function runAiCommand(){
+    const q=$("#aiAsk").value.toLowerCase();
+    let dest="repairhud", answer="I can help with that. ";
+    if(q.includes("invoice")){ dest="invoices"; answer+="This should go to Professional Invoices."; }
+    else if(q.includes("quote") || q.includes("estimate")){ dest="quotes"; answer+="This should go to Smart Quotes."; }
+    else if(q.includes("work order") || q.includes("job")){ dest="workorders"; answer+="This should create or update a Work Order."; }
+    else if(q.includes("part") || q.includes("water pump") || q.includes("belt") || q.includes("box") || q.includes("label")){ dest="parts"; answer+="This should go to Parts Lookup."; }
+    else if(q.includes("vin") || q.includes("truck")){ dest="truck"; answer+="This should update the Active Truck / VIN profile."; }
+    else if(q.includes("schedule") || q.includes("appointment")){ dest="schedule"; answer+="This should go to Schedule."; }
+    else if(q.includes("pin") || q.includes("gps") || q.includes("location")){ dest="pindrop"; answer+="This should save a Pin Drop location."; }
+    else if(q.includes("fault") || q.includes("spn") || q.includes("fmi") || q.includes("code")){ dest="fault"; answer+="This should open Fault Doctor."; }
+    $("#aiOut").textContent = `${answer}\n\nRecommended destination: ${dest.toUpperCase()}\n\nNext step: save it below or open that module.`;
+  }
+  $("#sendAi").onclick=runAiCommand;
+  $("#saveAi").onclick=()=>{ state.notes.push({type:"AI",note:$("#aiAsk").value,response:$("#aiOut").textContent,date:new Date().toLocaleString()}); saveState(); toast("AI note saved"); };
+
+  $$("[data-save-ai]").forEach(btn=>btn.onclick=()=>{
+    const type=btn.dataset.saveAi;
+    const note={source:"Rolling Wrench AI",note:$("#aiAsk").value,response:$("#aiOut").textContent,date:new Date().toLocaleString()};
+    if(type==="truck"){ state.notes.push({type:"Truck AI",...note}); }
+    if(type==="parts"){ state.parts.push({query:$("#aiAsk").value,notes:$("#aiOut").textContent}); }
+    if(type==="workorders"){ state.workorders.push({customer:state.truck.customer,truck:state.truck.unit,desc:$("#aiAsk").value,status:"Open"}); }
+    if(type==="quotes"){ state.quotes.push({customer:state.truck.customer,desc:$("#aiAsk").value,total:0}); }
+    if(type==="invoices"){ state.invoices.push({customer:state.truck.customer,truck:state.truck.unit,work:$("#aiAsk").value,total:0}); }
+    if(type==="memory"){ state.notes.push({type:"Repair Memory",...note}); }
+    saveState(); toast(`Saved to ${type}`);
+  });
 }
 
 function renderParts(){
@@ -464,11 +557,26 @@ function renderBusiness(){
   bindPageTools();
 }
 
+
+function renderAlerts(){
+  const alerts = [
+    ["PM Due", state.pm.length ? `${state.pm.length} PM reminders saved` : "No PM reminders saved yet"],
+    ["Schedule", state.schedule.length ? `${state.schedule.length} jobs on schedule` : "No jobs scheduled"],
+    ["Invoices", state.invoices.length ? `${state.invoices.length} invoices saved` : "No invoices saved"],
+    ["Clock", Object.values(state.jobs).some(j=>j.running) ? "A job clock is running" : "No job clock running"]
+  ];
+  $("#screen").innerHTML = `${pageHead("Alerts","",false)}
+    <section class="alert-list">
+      ${alerts.map(a=>`<div class="alert-card"><b>${a[0]}</b><small>${a[1]}</small></div>`).join("")}
+    </section>`;
+  bindPageTools();
+}
+
 const routes = {
   home:renderHome, clock:renderClock, truck:renderTruck, ai:renderAi, parts:renderParts, fault:renderFault,
   repairhud:renderRepairHud, quotes:renderQuotes, invoices:renderInvoices, workorders:renderWorkOrders,
   schedule:renderSchedule, customers:renderCustomers, pindrop:renderPinDrop, camera:renderCamera, reports:renderReports,
-  memory:renderMemory, suppliers:renderSuppliers, pmdue:renderPmDue, settings:renderSettings, repair:renderRepair, business:renderBusiness
+  memory:renderMemory, suppliers:renderSuppliers, pmdue:renderPmDue, settings:renderSettings, alerts:renderAlerts, repair:renderRepair, business:renderBusiness
 };
 function render(route=currentRoute()){
   const fn=routes[route] || renderHome;

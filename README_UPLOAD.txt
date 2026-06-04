@@ -20,3 +20,18 @@ Working screens:
 - LocalStorage save so data stays on the device
 
 Upload all files to the root of your GitHub Pages repo and commit.
+
+
+V4.2 UPDATE:
+- Sign-in intentionally left for last.
+- Rolling Wrench AI screen now works like a ChatGPT/Gemini style command center:
+  + add photo/file/document
+  take picture
+  scan document
+  scan invoice
+  scan part box/label
+  scan VIN plate
+  voice input support when browser allows it
+  save AI result to Truck, Parts, Work Orders, Quotes, Invoices, or Repair Memory
+- Added Alerts screen.
+- Home AI bar now shows + / voice / camera intent.
