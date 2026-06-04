@@ -79,3 +79,17 @@ V5 CORE PLATFORM:
 - Sign-in preview added, still last before real roles/cloud
 - Settings V4.8 retained
 NOTE: Real AI, real OCR, real supplier pricing, real GPS sharing, push notifications, and Supabase cloud sync require API/service connections after frontend approval.
+
+V5.1 SUPABASE:
+- Supabase URL and anon public key wired into frontend settings.
+- Added Supabase Sync screen.
+- Sync scaffold uses a generic rwd_app_data table.
+Required SQL:
+create table if not exists public.rwd_app_data (
+  id uuid primary key default gen_random_uuid(),
+  app_kind text,
+  local_id text,
+  payload jsonb,
+  created_at timestamptz default now()
+);
+For testing before sign-in, RLS must allow anon insert/select/update or be disabled on this table.

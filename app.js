@@ -979,6 +979,7 @@ function renderSettings(tab="main"){
       <label>Anon Key<input id="supabaseKey" value="${state.supabase?.anonKey || ""}" placeholder="Paste anon public key later"></label>
       <div class="sync-status"><i></i><span>Supabase Status: ${state.supabase?.enabled ? "Configured" : "Local Only"} • Last Sync: ${state.supabase?.lastSync || "Never"}</span></div>
       <div class="export-grid">
+        <button data-route="supabase">Open Supabase Sync</button>
         <button data-export="all">Backup Database</button>
         <button id="restoreData">Restore Database</button>
         <button data-export="customers">Export Customers</button>
@@ -1283,11 +1284,135 @@ function renderSignInPreview(){
   bindPageTools();
 }
 
+
+const RWD_SUPABASE_URL = "https://uxpkqwcmvtqvubibbrek.supabase.co";
+const RWD_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV4cGtxd2NtdnRxdnViaWJicmVrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcyMzk4NjQsImV4cCI6MjA5MjgxNTg2NH0.afiaSFqkRFEXW5nPQVRXKZcpKkS6iF3T_hTQC2P15HQ";
+
+function ensureSupabaseConfigured(){
+  ensureV5();
+  state.supabase = state.supabase || {};
+  if(!state.supabase.url) state.supabase.url = RWD_SUPABASE_URL;
+  if(!state.supabase.anonKey) state.supabase.anonKey = RWD_SUPABASE_ANON_KEY;
+  state.supabase.enabled = !!(state.supabase.url && state.supabase.anonKey);
+  saveState();
+}
+async function supabaseRest(table, method="GET", body=null){
+  ensureSupabaseConfigured();
+  const url = `${state.supabase.url}/rest/v1/${table}`;
+  const headers = {
+    "apikey": state.supabase.anonKey,
+    "Authorization": `Bearer ${state.supabase.anonKey}`,
+    "Content-Type": "application/json",
+    "Prefer": "return=representation"
+  };
+  const opts = {method, headers};
+  if(body) opts.body = JSON.stringify(body);
+  const res = await fetch(url, opts);
+  const text = await res.text();
+  let data;
+  try { data = text ? JSON.parse(text) : null; } catch(e) { data = text; }
+  if(!res.ok) throw new Error(`${res.status} ${res.statusText}: ${text}`);
+  return data;
+}
+function rwdDbPayload(kind, data){
+  return {
+    app_kind: kind,
+    payload: data,
+    local_id: data.id || data.vin || data.date || Date.now().toString(),
+    created_at: new Date().toISOString()
+  };
+}
+async function syncCollectionToSupabase(kind, arr){
+  const items = Array.isArray(arr) ? arr : [];
+  let ok=0, fail=0, errors=[];
+  for(const item of items){
+    try {
+      await supabaseRest("rwd_app_data", "POST", rwdDbPayload(kind,item));
+      ok++;
+    } catch(e) {
+      fail++;
+      errors.push(`${kind}: ${e.message}`);
+    }
+  }
+  return {kind, ok, fail, errors};
+}
+async function syncAllToSupabase(){
+  ensureSupabaseConfigured();
+  const log=[];
+  const packs = [
+    ["customers", state.customers],
+    ["trucks", state.trucks],
+    ["workorders", state.workorders],
+    ["quotes", state.quotes],
+    ["invoices", state.invoices],
+    ["schedule", state.schedule],
+    ["parts", state.parts],
+    ["pmRecords", state.pmRecords],
+    ["inventory", state.inventory],
+    ["aiConversations", state.aiConversations],
+    ["pins", state.pins],
+    ["ocrScans", state.ocrScans]
+  ];
+  for(const [kind, arr] of packs){
+    const r = await syncCollectionToSupabase(kind, arr || []);
+    log.push(`${kind}: synced ${r.ok}, failed ${r.fail}`);
+    if(r.errors.length) log.push(...r.errors.slice(0,3));
+  }
+  state.supabase.lastSync = new Date().toLocaleString();
+  saveState();
+  return log.join("\n");
+}
+async function testSupabaseConnection(){
+  ensureSupabaseConfigured();
+  return await supabaseRest("rwd_app_data?select=id&limit=1","GET");
+}
+
+
+function renderSupabaseSync(){
+  ensureSupabaseConfigured();
+  $("#screen").innerHTML = `${pageHead("Supabase Sync","",false)}
+    <section class="supabase-panel">
+      <b>Supabase Connected</b>
+      <small>Project: ${state.supabase.url}</small>
+      <small>Status: ${state.supabase.enabled ? "Configured" : "Missing key"}</small>
+      <small>Last Sync: ${state.supabase.lastSync || "Never"}</small>
+      <div class="sync-grid">
+        <button id="testSupabase">Test Connection</button>
+        <button id="syncSupabase">Sync Local Data</button>
+        <button data-route="settings">Open Settings</button>
+        <button data-export="all">Backup JSON</button>
+      </div>
+      <div class="sync-log" id="syncLog">Ready.</div>
+    </section>
+    <section class="settings-section">
+      <h3>Required Supabase Table</h3>
+      <div class="output">Create table: rwd_app_data
+Columns:
+id uuid default gen_random_uuid() primary key
+app_kind text
+local_id text
+payload jsonb
+created_at timestamptz default now()</div>
+    </section>`;
+  bindPageTools();
+  $("#testSupabase").onclick=async()=>{
+    $("#syncLog").textContent="Testing...";
+    try{ await testSupabaseConnection(); $("#syncLog").textContent="Connection good. Table exists."; toast("Supabase connected"); }
+    catch(e){ $("#syncLog").textContent="Connection failed or table missing:\\n"+e.message; toast("Check Supabase table"); }
+  };
+  $("#syncSupabase").onclick=async()=>{
+    $("#syncLog").textContent="Syncing local app data...";
+    try{ const log=await syncAllToSupabase(); $("#syncLog").textContent=log; toast("Sync complete"); }
+    catch(e){ $("#syncLog").textContent="Sync failed:\\n"+e.message; toast("Sync failed"); }
+  };
+  $$("[data-export]").forEach(b=>b.onclick=()=>exportJson(b.dataset.export));
+}
+
 const routes = {
   home:renderHome, clock:renderClock, truck:renderTruck, ai:renderAi, parts:renderParts, fault:renderFault,
   repairhud:renderRepairHud, quotes:renderQuotes, invoices:renderInvoices, workorders:renderWorkOrders,
   schedule:renderSchedule, customers:renderCustomers, pindrop:renderPinDrop, camera:renderCamera, reports:renderReports,
-  memory:renderMemory, suppliers:renderSuppliers, pmdue:renderPmDue, settings:renderSettings, alerts:renderAlerts, workflow:renderWorkflowHub, pmmanager:renderPMManager, inventory:renderInventory, supplierpricing:renderSupplierPricing, notifications:renderNotifications, signin:renderSignInPreview, repair:renderRepair, business:renderBusiness
+  memory:renderMemory, suppliers:renderSuppliers, pmdue:renderPmDue, settings:renderSettings, alerts:renderAlerts, workflow:renderWorkflowHub, pmmanager:renderPMManager, inventory:renderInventory, supplierpricing:renderSupplierPricing, notifications:renderNotifications, signin:renderSignInPreview, supabase:renderSupabaseSync, repair:renderRepair, business:renderBusiness
 };
 function render(route=currentRoute()){
   const fn=routes[route] || renderHome;
@@ -1328,6 +1453,7 @@ setInterval(()=>{
     if(currentRoute()==="home" || currentRoute()==="clock") ensureV46();
 ensureSettingsV48();
 ensureV5();
+ensureSupabaseConfigured();
 applyUiSettings();
 if(document.getElementById('alertCount')) document.getElementById('alertCount').textContent = (state.alerts||[]).filter(a=>!a.read).length;
 render(currentRoute());
@@ -1337,6 +1463,7 @@ render(currentRoute());
 ensureV46();
 ensureSettingsV48();
 ensureV5();
+ensureSupabaseConfigured();
 applyUiSettings();
 if(document.getElementById('alertCount')) document.getElementById('alertCount').textContent = (state.alerts||[]).filter(a=>!a.read).length;
 render(currentRoute());

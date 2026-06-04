@@ -599,3 +599,19 @@ body.high-contrast{--line:#ffffff;--muted:#e9eef5}
 .login-preview{max-width:440px;margin:0 auto;border:1px solid rgba(255,122,24,.5);background:linear-gradient(145deg,#17202b,#0b1118);border-radius:22px;padding:18px;box-shadow:var(--shadow)}
 .login-preview h2{text-align:center;text-transform:uppercase;margin:8px 0 4px}.login-preview p{text-align:center;color:var(--muted);margin:0 0 14px}
 @media(max-width:620px){.v5-hub-grid,.smart-action-row,.kpi-grid{grid-template-columns:1fr}.workflow-step{grid-template-columns:auto 1fr}}
+
+
+/* ===== V5.1 SUPABASE SYNC STATUS ===== */
+.supabase-panel{
+  border:1px solid rgba(57,168,255,.48);
+  background:linear-gradient(145deg,#142235,#071018);
+  border-radius:18px;
+  padding:12px;
+  margin-bottom:12px;
+}
+.supabase-panel b{display:block;color:var(--blue);text-transform:uppercase;letter-spacing:1px}
+.supabase-panel small{display:block;color:var(--muted);margin-top:4px}
+.sync-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:10px}
+.sync-grid button{border:1px solid rgba(104,121,139,.45);background:linear-gradient(145deg,#17222f,#0d131b);color:white;border-radius:13px;padding:11px 8px;font-weight:900;text-transform:uppercase}
+.sync-log{white-space:pre-wrap;background:#050a0f;border:1px solid #273746;border-radius:14px;padding:10px;color:#dce8f5;margin-top:10px;max-height:220px;overflow:auto}
+@media(max-width:520px){.sync-grid{grid-template-columns:1fr}}
