@@ -112,3 +112,15 @@ V5.2b SETTINGS HARD FIX:
 - Opens a standalone Settings control center.
 - Keeps Shop, Themes, Pricing, Employees, Alerts, Sounds, Display, AI, OCR, Cloud, Security.
 - Prevents Settings from being blocked by router/module errors.
+
+V6.0 PRODUCTION BUILD:
+- Copyright/legal footer and About/Legal screen.
+- Business Dashboard with KPIs and weekly graph.
+- AI Operator for workflow automation.
+- Photo Intelligence workflow.
+- Schedule Command Center.
+- Customer Portal preview.
+- Technician Mode.
+- Workflow automation hooks across customer/truck/work order/quote/invoice.
+- Existing V5.2b settings fix retained.
+NOTE: This is frontend/platform ready. Live AI/OCR/payment/customer portal public links still require backend/API deployment.

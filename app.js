@@ -122,6 +122,8 @@ function renderHome(){
     </section>
 
     <section class="v5-hub-grid">
+      <button class="v5-hub-card" data-route="dashboard"><b>Business Dashboard</b><small>Revenue • quotes • invoices • jobs</small></button>
+      <button class="v5-hub-card" data-route="aioperator"><b>AI Operator</b><small>Ask AI to build anything</small></button>
       <button class="v5-hub-card" data-route="v52"><b>V5.2 Engine</b><small>AI • OCR • files • GPS • cloud</small></button>
       <button class="v5-hub-card" data-route="workflow"><b>Workflow Hub</b><small>Customer → Truck → WO → Quote → Invoice</small></button>
       <button class="v5-hub-card" data-route="pmmanager"><b>PM Manager</b><small>Service due tracking</small></button>
@@ -1575,11 +1577,180 @@ function renderV52Dashboard(){
   bindPageTools();
 }
 
+
+function ensureV6(){
+  ensureV52();
+  if(!state.version) state.version = "V6.0 Production Build";
+  if(!state.portalLinks) state.portalLinks = [];
+  if(!state.techAssignments) state.techAssignments = [];
+  if(!state.photoIntelligence) state.photoIntelligence = [];
+  if(!state.payments) state.payments = [];
+}
+function v6DashboardTotals(){
+  const revenue = (state.invoices||[]).reduce((a,i)=>a+Number(i.total||0),0);
+  const openQuotes = (state.quotes||[]).length;
+  const openInvoices = (state.invoices||[]).filter(i=>!i.paid).length;
+  const scheduled = (state.schedule||[]).length + (state.pmRecords||[]).length;
+  return {revenue, openQuotes, openInvoices, scheduled};
+}
+function v6AutoWorkflowFromText(text){
+  ensureV6();
+  const routeInfo = v5RouteAiCommand(text);
+  let made = null;
+  if(routeInfo.action==="workorder") made = v5CreateWorkflow("workorder", text);
+  if(routeInfo.action==="quote") made = v5CreateWorkflow("quote", text);
+  if(routeInfo.action==="invoice") made = v5CreateWorkflow("invoice", text);
+  if(routeInfo.action==="pm"){
+    state.pmRecords.unshift({unit:state.truck.unit,type:text,priority:"Normal",date:"",miles:"",notes:"Created from V6 automation"});
+    made = state.pmRecords[0];
+  }
+  if(!made){
+    state.notes.push({type:"AI Operator",note:text,date:new Date().toLocaleString()});
+  }
+  saveState();
+  return routeInfo;
+}
+function v6MakePortalLink(type, id){
+  const link = `${location.origin}${location.pathname}#portal-${type}-${id || Date.now()}`;
+  state.portalLinks.unshift({type,id,link,date:new Date().toLocaleString(),customer:state.truck.customer});
+  saveState();
+  return link;
+}
+
+function renderBusinessDashboard(){
+  ensureV6();
+  const t=v6DashboardTotals();
+  $("#screen").innerHTML = `${pageHead("Business Dashboard","",false)}
+    <section class="v6-dash-grid">
+      <div class="v6-kpi"><span>Revenue</span><b>${money(t.revenue)}</b></div>
+      <div class="v6-kpi"><span>Open Quotes</span><b>${t.openQuotes}</b></div>
+      <div class="v6-kpi"><span>Open Invoices</span><b>${t.openInvoices}</b></div>
+      <div class="v6-kpi"><span>Scheduled</span><b>${t.scheduled}</b></div>
+    </section>
+    <section class="settings-section">
+      <h3>Weekly Earnings</h3>
+      <div class="chart-block"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+    </section>
+    <section class="v6-action-grid">
+      <button class="v6-action" data-route="workflow"><b>Workflow Hub</b><small>Customer → truck → quote → invoice</small></button>
+      <button class="v6-action" data-route="aioperator"><b>AI Operator</b><small>Speak/type and let AI build it</small></button>
+      <button class="v6-action" data-route="customerportal"><b>Customer Portal</b><small>Quote approval/sign/invoice link preview</small></button>
+      <button class="v6-action" data-route="techmode"><b>Technician Mode</b><small>Assigned jobs, clock, notes, photos</small></button>
+    </section>`;
+  bindPageTools();
+}
+function renderAIOperator(){
+  ensureV6();
+  $("#screen").innerHTML = `${pageHead("AI Operator","saveOperator")}
+    <section class="form-panel form-grid">
+      <div class="backend-banner"><b>Rolling Wrench AI Operator</b><small>Type or speak: build quote, invoice, work order, schedule, PM, parts, pin drop.</small></div>
+      <label>Command<textarea id="operatorCommand" placeholder="Build quote for X15 water pump..."></textarea></label>
+      <div class="smart-action-row"><button id="operatorVoice">🎙 Speak</button><button id="operatorRun">Run</button><button data-route="ai">Open AI Chat</button></div>
+      <div class="ai-live-response" id="operatorOut">Waiting for command.</div>
+    </section>`;
+  bindPageTools();
+  if($("#operatorVoice")) $("#operatorVoice").onclick=()=>startVoiceToField("operatorCommand");
+  $("#operatorRun").onclick=()=>{
+    const cmd=$("#operatorCommand").value;
+    const result=v6AutoWorkflowFromText(cmd);
+    $("#operatorOut").textContent=`Action: ${result.msg}\nRoute: ${result.route}\nCommand saved into workflow.`;
+    toast("AI operator complete");
+  };
+  $("#saveOperator").onclick=()=>{state.notes.push({type:"AI Operator",note:$("#operatorCommand").value,date:new Date().toLocaleString()});saveState();toast("Operator command saved");};
+}
+function renderPhotoIntelligence(){
+  ensureV6();
+  $("#screen").innerHTML = `${pageHead("Photo Intelligence","savePhotoIntel")}
+    <section class="form-panel form-grid">
+      <div class="backend-banner"><b>Photo Intelligence</b><small>Classifies photos into VIN, part label, fault screen, invoice, damage, truck, repair memory.</small></div>
+      <input id="photoIntelFile" type="file" accept="image/*,.pdf" capture="environment">
+      <label>What is it?<select id="photoIntelType"><option>Auto Detect</option><option>VIN Plate</option><option>Part Box / Label</option><option>Fault Screen</option><option>Invoice / Receipt</option><option>Damage Photo</option><option>Truck Photo</option></select></label>
+      <button class="action-btn primary" id="classifyPhoto">Classify / Save</button>
+      <div class="scan-result" id="photoIntelOut">No photo selected.</div>
+      <div>${state.photoIntelligence.map(p=>`<div class="portal-card"><b>${p.type}</b><small>${p.file} • ${p.date}<br>${p.result}</small></div>`).join("")}</div>
+    </section>`;
+  bindPageTools();
+  $("#classifyPhoto").onclick=()=>{
+    const f=$("#photoIntelFile").files[0];
+    const type=$("#photoIntelType").value;
+    const result=`${type} saved. Route: ${type.includes("VIN")?"Truck Profile":type.includes("Part")?"Parts Lookup":type.includes("Invoice")?"Invoices":type.includes("Fault")?"Fault Doctor":"Repair Memory"}`;
+    state.photoIntelligence.unshift({file:f?.name||"camera image",type,result,date:new Date().toLocaleString()});
+    if(f) v52SaveFileRecord(f,type);
+    $("#photoIntelOut").textContent=result;
+    saveState();toast("Photo classified");
+  };
+  $("#savePhotoIntel").onclick=()=>{saveState();toast("Photo intelligence saved")};
+}
+function renderScheduleCommand(){
+  ensureV6();
+  $("#screen").innerHTML = `${pageHead("Schedule Command","saveScheduleCommand")}
+    <section class="form-panel form-grid">
+      <div class="two-col"><label>Date<input id="cmdDate" type="date"></label><label>Time<input id="cmdTime" type="time"></label></div>
+      <label>Customer<input id="cmdCustomer" value="${state.truck.customer||""}"></label>
+      <label>Truck<input id="cmdTruck" value="${state.truck.unit||""}"></label>
+      <label>Job<textarea id="cmdJob"></textarea></label>
+      <label>Tech<select id="cmdTech">${(state.employees||[]).map(e=>`<option>${e.name}</option>`).join("")}</select></label>
+      <div class="smart-action-row"><button data-route="gpsmanager">GPS</button><button id="cmdCreateWO">Create WO</button><button id="cmdClock">Clock From Job</button></div>
+      <div>${(state.schedule||[]).map(s=>`<div class="schedule-command-card"><b>${s.date||""} ${s.time||""} — ${s.customer}</b><small>${s.job||""} • ${s.tech||""}</small></div>`).join("")}</div>
+    </section>`;
+  bindPageTools();
+  $("#cmdCreateWO").onclick=()=>{state.workorders.push({customer:$("#cmdCustomer").value,truck:$("#cmdTruck").value,desc:$("#cmdJob").value,status:"Open"});saveState();toast("WO created")};
+  $("#cmdClock").onclick=()=>{state.jobs.job1.name=$("#cmdJob").value||"Scheduled Job";state.jobs.job1.customer=$("#cmdCustomer").value;saveState();setRoute("clock")};
+  $("#saveScheduleCommand").onclick=()=>{state.schedule.unshift({date:$("#cmdDate").value,time:$("#cmdTime").value,customer:$("#cmdCustomer").value,truck:$("#cmdTruck").value,job:$("#cmdJob").value,tech:$("#cmdTech").value});saveState();toast("Schedule saved");renderScheduleCommand();};
+}
+function renderCustomerPortal(){
+  ensureV6();
+  $("#screen").innerHTML = `${pageHead("Customer Portal","savePortal")}
+    <section class="form-panel form-grid">
+      <div class="backend-banner"><b>Customer Link Preview</b><small>Customer can approve quote, sign quote, view invoice, send location, upload photos. Public link backend comes later.</small></div>
+      <label>Customer<input id="portalCustomer" value="${state.truck.customer||""}"></label>
+      <label>Portal Type<select id="portalType"><option>Quote Approval</option><option>Invoice View</option><option>Send Location</option><option>Upload Photos</option><option>Job Status</option></select></label>
+      <button class="action-btn primary" id="makePortalLink">Create Link Preview</button>
+      <div class="approval-link" id="portalLinkOut">No link created.</div>
+      <div>${state.portalLinks.map(l=>`<div class="portal-card"><b>${l.type}</b><small>${l.customer} • ${l.date}<br>${l.link}</small></div>`).join("")}</div>
+    </section>`;
+  bindPageTools();
+  $("#makePortalLink").onclick=()=>{const link=v6MakePortalLink($("#portalType").value,Date.now());$("#portalLinkOut").textContent=link;toast("Portal link created")};
+  $("#savePortal").onclick=()=>{saveState();toast("Portal saved")};
+}
+function renderTechMode(){
+  ensureV6();
+  $("#screen").innerHTML = `${pageHead("Technician Mode","saveTechMode")}
+    <section class="form-panel form-grid">
+      <label>Technician<select id="techName">${(state.employees||[]).map(e=>`<option>${e.name}</option>`).join("")}</select></label>
+      <label>Assigned Job<select id="techJob">${(state.schedule||[]).map(s=>`<option>${s.job||s.customer||"Scheduled Job"}</option>`).join("")}<option>Unassigned Job</option></select></label>
+      <label>Repair Notes<textarea id="techNotes" placeholder="Speak/type notes, upload photos, save to work order"></textarea></label>
+      <div class="smart-action-row"><button data-route="clock">Clock</button><button data-route="camera">Photo/OCR</button><button id="techSaveWO">Save to WO</button></div>
+      <div>${(state.techAssignments||[]).map(t=>`<div class="tech-card"><b>${t.tech} — ${t.job}</b><small>${t.date}<br>${t.notes}</small></div>`).join("")}</div>
+    </section>`;
+  bindPageTools();
+  $("#techSaveWO").onclick=()=>{state.techAssignments.unshift({tech:$("#techName").value,job:$("#techJob").value,notes:$("#techNotes").value,date:new Date().toLocaleString()});state.workorders.push({customer:state.truck.customer,truck:state.truck.unit,desc:$("#techNotes").value,status:"Tech Update"});saveState();toast("Tech update saved");renderTechMode();};
+  $("#saveTechMode").onclick=()=>{saveState();toast("Tech mode saved")};
+}
+function renderAboutLegal(){
+  ensureV6();
+  $("#screen").innerHTML = `${pageHead("About / Legal","",false)}
+    <section class="form-panel">
+      <div class="about-badge">RW</div>
+      <h2 style="text-align:center;margin:0;">Rolling Wrench AI Command Center</h2>
+      <p style="text-align:center;color:var(--muted);">Version: ${state.version || "V6.0"}<br>Developed for Rolling Wrench Diesel LLC</p>
+      <div class="output">© 2026 Rolling Wrench Diesel LLC
+All Rights Reserved.
+
+Rolling Wrench AI, Rolling Wrench Diesel, the Rolling Wrench logo, software workflows, layouts, quote/invoice templates, business processes, and related app content are proprietary property of Rolling Wrench Diesel LLC.
+
+Unauthorized copying, redistribution, modification, resale, or commercial use without written permission is prohibited.
+
+Generated by Rolling Wrench Diesel LLC.</div>
+    </section>`;
+  bindPageTools();
+}
+
 const routes = {
   home:renderHome, clock:renderClock, truck:renderTruck, ai:renderAi, parts:renderParts, fault:renderFault,
   repairhud:renderRepairHud, quotes:renderQuotes, invoices:renderInvoices, workorders:renderWorkOrders,
   schedule:renderSchedule, customers:renderCustomers, pindrop:renderPinDrop, camera:renderCamera, reports:renderReports,
-  memory:renderMemory, suppliers:renderSuppliers, pmdue:renderPmDue, settings:renderSettingsSafe, alerts:renderAlerts, workflow:renderWorkflowHub, pmmanager:renderPMManager, inventory:renderInventory, supplierpricing:renderSupplierPricing, notifications:renderNotifications, signin:renderSignInPreview, supabase:renderSupabaseSync, v52:renderV52Dashboard, aiengine:renderAiEngine, realocr:renderRealOCR, filestorage:renderFileStorage, gpsmanager:renderGPSManager, repair:renderRepair, business:renderBusiness
+  memory:renderMemory, suppliers:renderSuppliers, pmdue:renderPmDue, settings:renderSettingsSafe, alerts:renderAlerts, workflow:renderWorkflowHub, pmmanager:renderPMManager, inventory:renderInventory, supplierpricing:renderSupplierPricing, notifications:renderNotifications, signin:renderSignInPreview, supabase:renderSupabaseSync, v52:renderV52Dashboard, dashboard:renderBusinessDashboard, aioperator:renderAIOperator, photointel:renderPhotoIntelligence, schedulecommand:renderScheduleCommand, customerportal:renderCustomerPortal, techmode:renderTechMode, about:renderAboutLegal, aiengine:renderAiEngine, realocr:renderRealOCR, filestorage:renderFileStorage, gpsmanager:renderGPSManager, repair:renderRepair, business:renderBusiness
 };
 function render(route=currentRoute()){
   try{
