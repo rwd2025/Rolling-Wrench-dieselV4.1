@@ -66,3 +66,16 @@ V4.8 UPDATE:
 - Export customers/trucks/quotes/invoices/all data as JSON.
 - Restore database from JSON.
 - Theme and display options apply immediately.
+
+V5 CORE PLATFORM:
+- Workflow Hub: Customer -> Truck -> Work Order -> Quote -> Invoice -> Reports
+- AI command routing can create work orders, quotes, invoices, PM reminders
+- OCR/camera workflow retained
+- GPS/Pin Drop retained
+- PM Manager added
+- Inventory added
+- Supplier Pricing notes added
+- Notifications screen added
+- Sign-in preview added, still last before real roles/cloud
+- Settings V4.8 retained
+NOTE: Real AI, real OCR, real supplier pricing, real GPS sharing, push notifications, and Supabase cloud sync require API/service connections after frontend approval.

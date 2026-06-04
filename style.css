@@ -577,3 +577,25 @@ body.compact-mode .module-card{min-height:74px}
 body.compact-mode .panel{min-height:auto;padding:12px}
 body.large-text{font-size:18px}
 body.high-contrast{--line:#ffffff;--muted:#e9eef5}
+
+
+/* ===== V5 CORE PLATFORM ===== */
+.v5-hub-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:12px}
+.v5-hub-card{border:1px solid rgba(104,121,139,.42);background:linear-gradient(145deg,#17222f,#0d131b);border-radius:18px;padding:13px;color:white;text-align:left}
+.v5-hub-card b{display:block;text-transform:uppercase;color:var(--orange);letter-spacing:1px}
+.v5-hub-card small{display:block;color:var(--muted);margin-top:5px}
+.workflow-timeline{display:grid;gap:8px}
+.workflow-step{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;border:1px solid rgba(104,121,139,.35);background:#0a1017;border-radius:16px;padding:10px}
+.workflow-step i{width:30px;height:30px;border-radius:50%;background:linear-gradient(145deg,var(--orange),#833408);display:grid;place-items:center;color:white;font-style:normal;font-weight:900}
+.workflow-step b{display:block}.workflow-step small{display:block;color:var(--muted)}
+.smart-action-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+.smart-action-row button{border:1px solid rgba(104,121,139,.45);background:linear-gradient(145deg,#17222f,#0d131b);color:white;border-radius:13px;padding:11px 8px;font-weight:900;text-transform:uppercase}
+.pm-card,.inventory-card,.supplier-card,.notification-card{border:1px solid rgba(104,121,139,.35);background:#0a1017;border-radius:16px;padding:11px;margin-bottom:8px}
+.pm-card b,.inventory-card b,.supplier-card b,.notification-card b{display:block;color:#fff}
+.pm-card small,.inventory-card small,.supplier-card small,.notification-card small{display:block;color:var(--muted);margin-top:4px}
+.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.kpi-card{background:#0a1017;border:1px solid rgba(104,121,139,.35);border-radius:16px;padding:12px}
+.kpi-card span{display:block;color:var(--muted);font-size:12px;text-transform:uppercase}.kpi-card b{display:block;font-size:22px;color:var(--green);margin-top:5px}
+.login-preview{max-width:440px;margin:0 auto;border:1px solid rgba(255,122,24,.5);background:linear-gradient(145deg,#17202b,#0b1118);border-radius:22px;padding:18px;box-shadow:var(--shadow)}
+.login-preview h2{text-align:center;text-transform:uppercase;margin:8px 0 4px}.login-preview p{text-align:center;color:var(--muted);margin:0 0 14px}
+@media(max-width:620px){.v5-hub-grid,.smart-action-row,.kpi-grid{grid-template-columns:1fr}.workflow-step{grid-template-columns:auto 1fr}}

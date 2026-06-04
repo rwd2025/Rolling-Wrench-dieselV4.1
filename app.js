@@ -121,6 +121,13 @@ function renderHome(){
       </article>
     </section>
 
+    <section class="v5-hub-grid">
+      <button class="v5-hub-card" data-route="workflow"><b>Workflow Hub</b><small>Customer → Truck → WO → Quote → Invoice</small></button>
+      <button class="v5-hub-card" data-route="pmmanager"><b>PM Manager</b><small>Service due tracking</small></button>
+      <button class="v5-hub-card" data-route="inventory"><b>Inventory</b><small>Parts and supplies</small></button>
+      <button class="v5-hub-card" data-route="supplierpricing"><b>Supplier Pricing</b><small>Price/location notes</small></button>
+    </section>
+
     <section class="system-strip">
       <div class="status-box"><b>GPS</b><span>Ready</span><i></i></div>
       <div class="status-box"><b>Camera</b><span>Ready</span><i></i></div>
@@ -342,7 +349,11 @@ function renderAi(){
     const chat = getActiveChat();
     if(chat.messages.length === 0) chat.title = q.slice(0,34);
     chat.messages.push({role:"user", text:q, time:new Date().toLocaleString()});
-    chat.messages.push({role:"assistant", text:aiReply(q), time:new Date().toLocaleString()});
+    const routeInfo = v5RouteAiCommand(q);
+    const answer = aiReply(q) + "\n\nAction: " + routeInfo.msg;
+    chat.messages.push({role:"assistant", text:answer, time:new Date().toLocaleString()});
+    if(routeInfo.action==="workorder" || routeInfo.action==="quote" || routeInfo.action==="invoice"){ v5CreateWorkflow(routeInfo.action, q); }
+    if(routeInfo.action==="pm"){ state.pmRecords.unshift({unit:state.truck.unit,type:q,priority:"Normal",date:"",miles:"",notes:"Created from AI"}); v5AddNotification("PM Created From AI", q); }
     chat.updated = new Date().toLocaleString();
     saveState();
     renderAi();
@@ -1132,11 +1143,151 @@ function localAiAnswer(q){
   return localAiAnswer(q);
 }
 
+
+function ensureV5(){
+  ensureV46();
+  ensureSettingsV48();
+  if(!state.pmRecords) state.pmRecords=[];
+  if(!state.inventory) state.inventory=[];
+  if(!state.notifications) state.notifications=[];
+  if(!state.supplierSearches) state.supplierSearches=[];
+  if(!state.workflowLinks) state.workflowLinks=[];
+  if(!state.authPreview) state.authPreview={enabled:false,email:"",role:"Owner/Admin"};
+}
+function v5AddNotification(title,body){
+  ensureV5();
+  state.notifications.unshift({title,body,date:new Date().toLocaleString(),read:false});
+  saveState();
+}
+function v5CurrentContext(){
+  return {
+    customer: state.truck.customer || "",
+    truck: state.truck.unit || "",
+    vin: state.truck.vin || "",
+    engine: state.truck.engine || ""
+  };
+}
+function v5CreateWorkflow(kind, desc){
+  ensureV5();
+  const ctx=v5CurrentContext();
+  const id=Date.now().toString();
+  const item={id,kind,desc,customer:ctx.customer,truck:ctx.truck,vin:ctx.vin,date:new Date().toLocaleString()};
+  state.workflowLinks.unshift(item);
+  if(kind==="workorder") state.workorders.push({customer:ctx.customer,truck:ctx.truck,desc,status:"Open",workflowId:id});
+  if(kind==="quote") state.quotes.push({customer:ctx.customer,truck:ctx.truck,desc,total:0,workflowId:id});
+  if(kind==="invoice") state.invoices.push({customer:ctx.customer,truck:ctx.truck,work:desc,total:0,workflowId:id});
+  addTruckHistory("Workflow", `${kind}: ${desc}`);
+  saveState();
+  return item;
+}
+function v5RouteAiCommand(q){
+  const text=(q||"").toLowerCase();
+  if(text.includes("invoice")) return {route:"invoices", action:"invoice", msg:"Created invoice workflow"};
+  if(text.includes("quote") || text.includes("estimate")) return {route:"quotes", action:"quote", msg:"Created quote workflow"};
+  if(text.includes("work order") || text.includes("job")) return {route:"workorders", action:"workorder", msg:"Created work order workflow"};
+  if(text.includes("pm") || text.includes("maintenance")) return {route:"pmmanager", action:"pm", msg:"Created PM reminder"};
+  if(text.includes("inventory") || text.includes("stock")) return {route:"inventory", action:"inventory", msg:"Opened inventory"};
+  if(text.includes("supplier") || text.includes("price") || text.includes("parts location")) return {route:"supplierpricing", action:"supplier", msg:"Opened supplier pricing"};
+  if(text.includes("pin") || text.includes("gps") || text.includes("location")) return {route:"pindrop", action:"pin", msg:"Opened pin drop"};
+  if(text.includes("scan") || text.includes("ocr") || text.includes("photo")) return {route:"camera", action:"ocr", msg:"Opened OCR scanner"};
+  return {route:"repairhud", action:"note", msg:"Saved AI repair note"};
+}
+
+
+function renderWorkflowHub(){
+  ensureV5();
+  $("#screen").innerHTML = `${pageHead("Workflow Hub","",false)}
+    <section class="backend-banner"><b>Business Workflow</b><small>Customer → Truck → Work Order → Quote → Invoice → Reports</small></section>
+    <section class="workflow-timeline">
+      <div class="workflow-step"><i>1</i><div><b>Customer</b><small>${state.truck.customer || "No active customer"}</small></div><button class="action-btn" data-route="customers">Open</button></div>
+      <div class="workflow-step"><i>2</i><div><b>Truck</b><small>${state.truck.unit || "No truck"} • ${state.truck.vin || "NO VIN"}</small></div><button class="action-btn" data-route="truck">Open</button></div>
+      <div class="workflow-step"><i>3</i><div><b>Work Order</b><small>${state.workorders.length} saved</small></div><button class="action-btn" data-route="workorders">Open</button></div>
+      <div class="workflow-step"><i>4</i><div><b>Quote</b><small>${state.quotes.length} saved</small></div><button class="action-btn" data-route="quotes">Open</button></div>
+      <div class="workflow-step"><i>5</i><div><b>Invoice</b><small>${state.invoices.length} saved</small></div><button class="action-btn" data-route="invoices">Open</button></div>
+      <div class="workflow-step"><i>6</i><div><b>Reports</b><small>Revenue / labor / history</small></div><button class="action-btn" data-route="reports">Open</button></div>
+    </section>
+    <section class="smart-action-row">
+      <button id="quickWO">New WO</button><button id="quickQuote">New Quote</button><button id="quickInvoice">New Invoice</button>
+    </section>`;
+  bindPageTools();
+  $("#quickWO").onclick=()=>{v5CreateWorkflow("workorder","Quick workflow work order");toast("Work order created");};
+  $("#quickQuote").onclick=()=>{v5CreateWorkflow("quote","Quick workflow quote");toast("Quote created");};
+  $("#quickInvoice").onclick=()=>{v5CreateWorkflow("invoice","Quick workflow invoice");toast("Invoice created");};
+}
+
+function renderPMManager(){
+  ensureV5();
+  $("#screen").innerHTML = `${pageHead("PM Manager","savePmManager")}
+    <section class="form-panel form-grid">
+      <label>Truck / Unit<input id="pmUnit" value="${state.truck.unit || ""}"></label>
+      <div class="two-col"><label>Service Type<input id="pmType" placeholder="Oil, DOT, filters, brakes, overhead"></label><label>Due Mileage<input id="pmMiles" type="number"></label></div>
+      <div class="two-col"><label>Due Date<input id="pmDate" type="date"></label><label>Priority<select id="pmPriority"><option>Normal</option><option>High</option><option>Critical</option></select></label></div>
+      <label>Notes<textarea id="pmNotes"></textarea></label>
+      <div>${state.pmRecords.length ? state.pmRecords.map(p=>`<div class="pm-card"><b>${p.unit} — ${p.type}</b><small>Due: ${p.date || "No date"} / ${p.miles || "No miles"} • ${p.priority}<br>${p.notes || ""}</small></div>`).join("") : `<div class="output">No PM records yet.</div>`}</div>
+    </section>`;
+  bindPageTools();
+  $("#savePmManager").onclick=()=>{state.pmRecords.unshift({unit:$("#pmUnit").value,type:$("#pmType").value,miles:$("#pmMiles").value,date:$("#pmDate").value,priority:$("#pmPriority").value,notes:$("#pmNotes").value});v5AddNotification("PM Due Added",`${$("#pmUnit").value} ${$("#pmType").value}`);saveState();toast("PM saved");renderPMManager();};
+}
+
+function renderInventory(){
+  ensureV5();
+  $("#screen").innerHTML = `${pageHead("Inventory","saveInventory")}
+    <section class="form-panel form-grid">
+      <div class="two-col"><label>Item / Part<input id="invItem"></label><label>Part Number<input id="invPart"></label></div>
+      <div class="two-col"><label>Quantity<input id="invQty" type="number"></label><label>Cost Each<input id="invCost" type="number" step=".01"></label></div>
+      <label>Location<input id="invLocation" placeholder="Truck, shop, shelf, bin"></label>
+      <label>Notes<textarea id="invNotes2"></textarea></label>
+      <div>${state.inventory.length ? state.inventory.map(i=>`<div class="inventory-card"><b>${i.item} • ${i.part}</b><small>Qty ${i.qty} • ${money(i.cost)} each • ${i.location}<br>${i.notes || ""}</small></div>`).join("") : `<div class="output">No inventory saved.</div>`}</div>
+    </section>`;
+  bindPageTools();
+  $("#saveInventory").onclick=()=>{state.inventory.unshift({item:$("#invItem").value,part:$("#invPart").value,qty:+$("#invQty").value||0,cost:+$("#invCost").value||0,location:$("#invLocation").value,notes:$("#invNotes2").value});saveState();toast("Inventory saved");renderInventory();};
+}
+
+function renderSupplierPricing(){
+  ensureV5();
+  $("#screen").innerHTML = `${pageHead("Supplier Pricing","saveSupplierSearch")}
+    <section class="form-panel form-grid">
+      <div class="backend-banner"><b>Supplier Pricing Ready</b><small>Real pricing needs supplier APIs or manual entry. This screen stores search results and location notes.</small></div>
+      <label>Part / Job<input id="supplierPart" placeholder="X15 water pump, wheel seal, clutch kit..."></label>
+      <div class="two-col"><label>Supplier<input id="supplierName" placeholder="FleetPride / dealer / NAPA"></label><label>Location<input id="supplierLocation" placeholder="City / branch"></label></div>
+      <div class="two-col"><label>Price<input id="supplierPrice" type="number" step=".01"></label><label>Availability<input id="supplierAvailability" placeholder="In stock / ordered"></label></div>
+      <label>Notes<textarea id="supplierSearchNotes"></textarea></label>
+      <button class="action-btn" onclick="window.open('https://www.google.com/maps/search/heavy+duty+truck+parts+near+me','_blank')">Open Local Parts Map</button>
+      <div>${state.supplierSearches.length ? state.supplierSearches.map(s=>`<div class="supplier-card"><b>${s.part} — ${s.supplier}</b><small>${s.location} • ${money(s.price)} • ${s.availability}<br>${s.notes || ""}</small></div>`).join("") : `<div class="output">No supplier pricing saved.</div>`}</div>
+    </section>`;
+  bindPageTools();
+  $("#saveSupplierSearch").onclick=()=>{state.supplierSearches.unshift({part:$("#supplierPart").value,supplier:$("#supplierName").value,location:$("#supplierLocation").value,price:+$("#supplierPrice").value||0,availability:$("#supplierAvailability").value,notes:$("#supplierSearchNotes").value});saveState();toast("Supplier pricing saved");renderSupplierPricing();};
+}
+
+function renderNotifications(){
+  ensureV5();
+  $("#screen").innerHTML = `${pageHead("Notifications","",false)}
+    <section class="form-panel">
+      ${(state.notifications||[]).length ? state.notifications.map(n=>`<div class="notification-card"><b>${n.title}</b><small>${n.date}<br>${n.body}</small></div>`).join("") : `<div class="output">No notifications yet.</div>`}
+    </section>`;
+  bindPageTools();
+}
+
+function renderSignInPreview(){
+  ensureV5();
+  $("#screen").innerHTML = `${pageHead("Sign In Preview","",false)}
+    <section class="login-preview">
+      <div class="brand-mark" style="margin:0 auto 10px;">RW</div>
+      <h2>Rolling Wrench AI</h2>
+      <p>Sign-in comes last after core app is approved.</p>
+      <label>Email<input id="loginEmail" placeholder="owner@shop.com"></label>
+      <label>Password<input type="password" placeholder="Password"></label>
+      <button class="action-btn primary" style="width:100%;margin-top:12px;">Sign In Preview</button>
+      <div class="output" style="margin-top:12px;">Future roles: Owner/Admin, Operations Manager, Technician, Customer Approval.</div>
+    </section>`;
+  bindPageTools();
+}
+
 const routes = {
   home:renderHome, clock:renderClock, truck:renderTruck, ai:renderAi, parts:renderParts, fault:renderFault,
   repairhud:renderRepairHud, quotes:renderQuotes, invoices:renderInvoices, workorders:renderWorkOrders,
   schedule:renderSchedule, customers:renderCustomers, pindrop:renderPinDrop, camera:renderCamera, reports:renderReports,
-  memory:renderMemory, suppliers:renderSuppliers, pmdue:renderPmDue, settings:renderSettings, alerts:renderAlerts, repair:renderRepair, business:renderBusiness
+  memory:renderMemory, suppliers:renderSuppliers, pmdue:renderPmDue, settings:renderSettings, alerts:renderAlerts, workflow:renderWorkflowHub, pmmanager:renderPMManager, inventory:renderInventory, supplierpricing:renderSupplierPricing, notifications:renderNotifications, signin:renderSignInPreview, repair:renderRepair, business:renderBusiness
 };
 function render(route=currentRoute()){
   const fn=routes[route] || renderHome;
@@ -1176,6 +1327,7 @@ setInterval(()=>{
     saveState();
     if(currentRoute()==="home" || currentRoute()==="clock") ensureV46();
 ensureSettingsV48();
+ensureV5();
 applyUiSettings();
 if(document.getElementById('alertCount')) document.getElementById('alertCount').textContent = (state.alerts||[]).filter(a=>!a.read).length;
 render(currentRoute());
@@ -1184,6 +1336,7 @@ render(currentRoute());
 
 ensureV46();
 ensureSettingsV48();
+ensureV5();
 applyUiSettings();
 if(document.getElementById('alertCount')) document.getElementById('alertCount').textContent = (state.alerts||[]).filter(a=>!a.read).length;
 render(currentRoute());
