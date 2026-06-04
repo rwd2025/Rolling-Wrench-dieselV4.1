@@ -1,0 +1,11 @@
+PASS - index.html
+PASS - style.css
+PASS - app.js
+PASS - manifest.json
+PASS - service-worker.js
+PASS - JS syntax
+PASS - SmartQuoteEngine
+PASS - quote-engine
+PASS - inhouse toggle
+PASS - mobile service fee
+PASS - roadside multiplier

@@ -1,0 +1,14 @@
+PASS - file:index.html
+PASS - file:style.css
+PASS - file:app.js
+PASS - file:manifest.json
+PASS - file:service-worker.js
+PASS - JS syntax
+PASS - parts lookup screen exists
+PASS - old parts cost field removed
+PASS - old markup field removed
+PASS - old qty billing field removed
+PASS - parts cross ref mode
+PASS - professional invoice config
+PASS - workorders professional RO
+PASS - full AI exists

@@ -1,0 +1,13 @@
+PASS - index.html
+PASS - style.css
+PASS - app.js
+PASS - manifest.json
+PASS - service-worker.js
+PASS - JS syntax
+PASS - RouteGuard
+PASS - ThemeResetManager
+PASS - Default off theme
+PASS - AI full
+PASS - PartsBrain
+PASS - Emergency not parts literal
+PASS - Repair not repair literal

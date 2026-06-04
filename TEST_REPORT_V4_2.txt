@@ -1,0 +1,12 @@
+PASS - index.html
+PASS - style.css
+PASS - app.js
+PASS - manifest.json
+PASS - service-worker.js
+PASS - JS syntax
+PASS - AI full screen exists
+PASS - AI assistant routes full
+PASS - Pin Drop present
+PASS - DOT / GPS removed
+PASS - Work order test buttons
+PASS - GpsModule roadside

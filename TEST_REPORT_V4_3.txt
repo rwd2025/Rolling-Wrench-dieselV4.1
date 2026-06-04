@@ -1,0 +1,10 @@
+PASS - file:index.html
+PASS - file:style.css
+PASS - file:app.js
+PASS - file:manifest.json
+PASS - file:service-worker.js
+PASS - JS syntax
+PASS - full AI screen
+PASS - parts lookup brain
+PASS - reports cleanup
+PASS - debug exists
