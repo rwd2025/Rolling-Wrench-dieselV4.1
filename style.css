@@ -615,3 +615,11 @@ body.high-contrast{--line:#ffffff;--muted:#e9eef5}
 .sync-grid button{border:1px solid rgba(104,121,139,.45);background:linear-gradient(145deg,#17222f,#0d131b);color:white;border-radius:13px;padding:11px 8px;font-weight:900;text-transform:uppercase}
 .sync-log{white-space:pre-wrap;background:#050a0f;border:1px solid #273746;border-radius:14px;padding:10px;color:#dce8f5;margin-top:10px;max-height:220px;overflow:auto}
 @media(max-width:520px){.sync-grid{grid-template-columns:1fr}}
+
+.error-panel{border:1px solid #8f3c3c;background:linear-gradient(145deg,#231418,#0b1118);border-radius:18px;padding:14px;color:#fff}
+.error-panel b{display:block;color:#ff8a8a;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px}
+.safe-settings-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.safe-settings-card{border:1px solid rgba(104,121,139,.42);background:linear-gradient(145deg,#17222f,#0d131b);color:white;border-radius:16px;padding:13px;text-align:left}
+.safe-settings-card b{display:block;color:var(--orange);text-transform:uppercase}
+.safe-settings-card small{display:block;color:var(--muted);margin-top:5px}
+@media(max-width:520px){.safe-settings-grid{grid-template-columns:1fr}}

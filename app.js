@@ -1412,13 +1412,21 @@ const routes = {
   home:renderHome, clock:renderClock, truck:renderTruck, ai:renderAi, parts:renderParts, fault:renderFault,
   repairhud:renderRepairHud, quotes:renderQuotes, invoices:renderInvoices, workorders:renderWorkOrders,
   schedule:renderSchedule, customers:renderCustomers, pindrop:renderPinDrop, camera:renderCamera, reports:renderReports,
-  memory:renderMemory, suppliers:renderSuppliers, pmdue:renderPmDue, settings:renderSettings, alerts:renderAlerts, workflow:renderWorkflowHub, pmmanager:renderPMManager, inventory:renderInventory, supplierpricing:renderSupplierPricing, notifications:renderNotifications, signin:renderSignInPreview, supabase:renderSupabaseSync, repair:renderRepair, business:renderBusiness
+  memory:renderMemory, suppliers:renderSuppliers, pmdue:renderPmDue, settings:renderSettingsSafe, alerts:renderAlerts, workflow:renderWorkflowHub, pmmanager:renderPMManager, inventory:renderInventory, supplierpricing:renderSupplierPricing, notifications:renderNotifications, signin:renderSignInPreview, supabase:renderSupabaseSync, repair:renderRepair, business:renderBusiness
 };
 function render(route=currentRoute()){
-  const fn=routes[route] || renderHome;
-  fn();
-  $$(".bottom-nav button").forEach(b=>b.classList.toggle("active", b.dataset.route===route || (route==="home" && b.dataset.route==="home")));
+  try{
+    if(!route) route="home";
+    const fn=routes[route] || renderHome;
+    fn();
+    $$(".bottom-nav button").forEach(b=>b.classList.toggle("active", b.dataset.route===route || (route==="home" && b.dataset.route==="home")));
+  }catch(err){
+    console.error(err);
+    if(route==="settings") renderSettingsSafe();
+    else renderSafeError(route, err);
+  }
 }
+
 document.addEventListener("click", e=>{
   const r=e.target.closest("[data-route]");
   if(r){ e.preventDefault(); setRoute(r.dataset.route); return; }
@@ -1466,5 +1474,86 @@ ensureV5();
 ensureSupabaseConfigured();
 applyUiSettings();
 if(document.getElementById('alertCount')) document.getElementById('alertCount').textContent = (state.alerts||[]).filter(a=>!a.read).length;
+
+function renderSafeError(route, err){
+  const screenEl = document.getElementById("screen");
+  if(!screenEl) return;
+  screenEl.innerHTML = `<section class="error-panel">
+    <b>Screen Load Error</b>
+    <p>${route} did not load correctly.</p>
+    <small>${err && err.message ? err.message : err}</small>
+    <div class="smart-action-row">
+      <button class="action-btn primary" data-route="home">Go Home</button>
+      <button class="action-btn" data-route="settings">Open Settings</button>
+    </div>
+  </section>`;
+}
+function renderSettingsSafe(){
+  if(typeof ensureV46 === "function") ensureV46();
+  if(typeof ensureV5 === "function") ensureV5();
+  if(typeof ensureSettingsV48 === "function") ensureSettingsV48();
+  state.settings = state.settings || {};
+  state.ui = state.ui || {};
+  state.pricing = state.pricing || {};
+  state.employees = state.employees || [];
+  state.alertSettings = state.alertSettings || {};
+  state.soundSettings = state.soundSettings || {};
+  state.aiSettings = state.aiSettings || {};
+  state.ocrSettings = state.ocrSettings || {};
+  state.security = state.security || {};
+  state.supabase = state.supabase || {};
+  document.getElementById("screen").innerHTML = `${pageHead("Settings","safeSaveSettings")}
+    <section class="settings-section form-grid">
+      <h3>Shop Settings</h3>
+      <label>Shop Name<input id="safeShop" value="${state.settings.shop || "Rolling Wrench Diesel"}"></label>
+      <label>Phone<input id="safePhone" value="${state.settings.phone || "260-502-6222"}"></label>
+      <div class="two-col">
+        <label>Labor Rate<input id="safeLabor" type="number" value="${state.settings.laborRate || state.pricing.mobileLabor || 135}"></label>
+        <label>Service Call<input id="safeCall" type="number" value="${state.settings.serviceCall || state.pricing.serviceCall || 250}"></label>
+      </div>
+    </section>
+    <section class="settings-section">
+      <h3>Settings Control Center</h3>
+      <div class="safe-settings-grid">
+        <button class="safe-settings-card" data-safe-setting="themes"><b>Themes</b><small>Orange, green, blue, red, gray, light</small></button>
+        <button class="safe-settings-card" data-safe-setting="pricing"><b>Pricing</b><small>Labor, service call, tax, fees</small></button>
+        <button class="safe-settings-card" data-safe-setting="employees"><b>Employees</b><small>Techs, managers, rates</small></button>
+        <button class="safe-settings-card" data-safe-setting="alerts"><b>Alerts</b><small>PM, schedule, invoice, quote</small></button>
+        <button class="safe-settings-card" data-safe-setting="sounds"><b>Sounds</b><small>Voice, button, notification</small></button>
+        <button class="safe-settings-card" data-safe-setting="display"><b>Display</b><small>Compact, large text, contrast</small></button>
+        <button class="safe-settings-card" data-safe-setting="ai"><b>AI Settings</b><small>Voice, memory, conversations</small></button>
+        <button class="safe-settings-card" data-safe-setting="cloud"><b>Cloud / Backup</b><small>Supabase, export, restore</small></button>
+      </div>
+    </section>
+    <section class="settings-section" id="safeSettingsDetail">
+      <h3>Details</h3>
+      <div class="output">Tap a settings card above.</div>
+    </section>`;
+  bindPageTools();
+  document.getElementById("safeSaveSettings").onclick=()=>{
+    state.settings.shop=document.getElementById("safeShop").value;
+    state.settings.phone=document.getElementById("safePhone").value;
+    state.settings.laborRate=+document.getElementById("safeLabor").value || 135;
+    state.settings.serviceCall=+document.getElementById("safeCall").value || 250;
+    state.pricing = state.pricing || {};
+    state.pricing.mobileLabor=state.settings.laborRate;
+    state.pricing.serviceCall=state.settings.serviceCall;
+    saveState();
+    toast("Settings saved");
+  };
+  document.querySelectorAll("[data-safe-setting]").forEach(btn=>btn.onclick=()=>{
+    const type=btn.dataset.safeSetting;
+    const d=document.getElementById("safeSettingsDetail");
+    if(type==="themes") d.innerHTML=`<h3>Themes</h3><div class="output">Theme controls are active in the full settings build. Current theme data is saved locally.</div>`;
+    if(type==="pricing") d.innerHTML=`<h3>Pricing</h3><div class="output">Labor Rate: ${money(state.settings.laborRate || 135)}\nService Call: ${money(state.settings.serviceCall || 250)}</div>`;
+    if(type==="employees") d.innerHTML=`<h3>Employees</h3><div class="output">${(state.employees||[]).map(e=>`${e.name || "Employee"} — ${e.role || ""}`).join("\\n") || "No employees saved."}</div>`;
+    if(type==="alerts") d.innerHTML=`<h3>Alerts</h3><div class="output">PM alerts, schedule alerts, invoice alerts, quote follow-ups, clock alerts, truck service alerts.</div>`;
+    if(type==="sounds") d.innerHTML=`<h3>Sounds</h3><div class="output">Button clicks, save confirmation, AI voice, notifications, clock in/out, volume.</div>`;
+    if(type==="display") d.innerHTML=`<h3>Display</h3><div class="output">Compact mode, large text, high contrast, show/hide dashboard cards.</div>`;
+    if(type==="ai") d.innerHTML=`<h3>AI Settings</h3><div class="output">AI voice, voice speed, voice type, auto read answers, save conversations, remember truck/customer.</div>`;
+    if(type==="cloud") d.innerHTML=`<h3>Cloud / Backup</h3><div class="output">Supabase: ${(state.supabase && state.supabase.url) || "Not configured"}</div><button class="action-btn primary" data-route="supabase">Open Supabase Sync</button>`;
+  });
+}
+
 render(currentRoute());
 if("serviceWorker" in navigator){navigator.serviceWorker.register("./service-worker.js").catch(()=>{});}

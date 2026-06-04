@@ -93,3 +93,5 @@ create table if not exists public.rwd_app_data (
   created_at timestamptz default now()
 );
 For testing before sign-in, RLS must allow anon insert/select/update or be disabled on this table.
+
+V5.1a STABILITY PATCH: Settings button routes to safe settings screen, render function wrapped with fallback to prevent blank screens.
