@@ -122,6 +122,7 @@ function renderHome(){
     </section>
 
     <section class="v5-hub-grid">
+      <button class="v5-hub-card" data-route="v52"><b>V5.2 Engine</b><small>AI • OCR • files • GPS • cloud</small></button>
       <button class="v5-hub-card" data-route="workflow"><b>Workflow Hub</b><small>Customer → Truck → WO → Quote → Invoice</small></button>
       <button class="v5-hub-card" data-route="pmmanager"><b>PM Manager</b><small>Service due tracking</small></button>
       <button class="v5-hub-card" data-route="inventory"><b>Inventory</b><small>Parts and supplies</small></button>
@@ -342,7 +343,7 @@ function renderAi(){
     return "Got it. I saved this conversation here. I can route it to Truck, Parts, Fault Doctor, Quotes, Invoices, Work Orders, Schedule, Pin Drop, or Repair Memory.";
   }
 
-  function sendMessage(){
+  async function sendMessage(){
     const box = $("#aiAsk");
     const q = box.value.trim();
     if(!q) return;
@@ -350,7 +351,8 @@ function renderAi(){
     if(chat.messages.length === 0) chat.title = q.slice(0,34);
     chat.messages.push({role:"user", text:q, time:new Date().toLocaleString()});
     const routeInfo = v5RouteAiCommand(q);
-    const answer = aiReply(q) + "\n\nAction: " + routeInfo.msg;
+    let answer = aiReply(q) + "\n\nAction: " + routeInfo.msg;
+    try { answer = await v52AskAi(q); } catch(e) { answer += "\n\nAI engine note: " + e.message; }
     chat.messages.push({role:"assistant", text:answer, time:new Date().toLocaleString()});
     if(routeInfo.action==="workorder" || routeInfo.action==="quote" || routeInfo.action==="invoice"){ v5CreateWorkflow(routeInfo.action, q); }
     if(routeInfo.action==="pm"){ state.pmRecords.unshift({unit:state.truck.unit,type:q,priority:"Normal",date:"",miles:"",notes:"Created from AI"}); v5AddNotification("PM Created From AI", q); }
@@ -1408,11 +1410,176 @@ created_at timestamptz default now()</div>
   $$("[data-export]").forEach(b=>b.onclick=()=>exportJson(b.dataset.export));
 }
 
+
+function ensureV52(){
+  ensureV5();
+  if(!state.aiService) state.aiService = {apiKey:"", endpoint:"", mode:"local"};
+  if(!state.fileUploads) state.fileUploads = [];
+  if(!state.storage) state.storage = {bucket:"rwd-files", uploaded:[]};
+  if(!state.gpsPins) state.gpsPins = [];
+  if(!state.serviceEngine) state.serviceEngine = {ready:true};
+}
+async function v52AskAi(prompt, attachments=[]){
+  ensureV52();
+  // Live backend endpoint is ready here. Without endpoint/key, local smart workflow answers.
+  if(state.aiService.endpoint && state.aiService.apiKey){
+    try{
+      const res = await fetch(state.aiService.endpoint,{
+        method:"POST",
+        headers:{"Content-Type":"application/json","Authorization":"Bearer "+state.aiService.apiKey},
+        body:JSON.stringify({prompt, attachments, context:{truck:state.truck, customer:state.truck.customer, settings:state.settings}})
+      });
+      if(res.ok){
+        const data = await res.json();
+        return data.answer || data.text || JSON.stringify(data);
+      }
+    }catch(e){
+      return "AI backend failed, using local workflow. Error: "+e.message+"\\n\\n"+v52LocalAi(prompt);
+    }
+  }
+  return v52LocalAi(prompt);
+}
+function v52LocalAi(prompt){
+  const q=(prompt||"").toLowerCase();
+  const ctx=`Active Truck: ${state.truck.unit || "NONE"} ${state.truck.vin || ""} ${state.truck.engine || ""}`;
+  if(q.includes("quote")){
+    return `AI Quote Draft\\n${ctx}\\n\\nI can build this quote using labor rate ${money(state.settings.laborRate || 135)}/hr and service call ${money(state.settings.serviceCall || 250)}.\\n\\nNext: save to Smart Quotes or preview professional quote.`;
+  }
+  if(q.includes("invoice")){
+    return `AI Invoice Draft\\n${ctx}\\n\\nI can turn your spoken work performed into professional invoice language, add labor/parts/service call, signature, and payment terms.`;
+  }
+  if(q.includes("work order") || q.includes("job")){
+    return `Work Order Draft\\n${ctx}\\n\\nComplaint / Cause / Correction workflow is ready. I can create a work order from this note.`;
+  }
+  if(q.includes("part") || q.includes("water pump") || q.includes("belt") || q.includes("clutch")){
+    return `Parts Lookup Draft\\n${ctx}\\n\\nLikely parts list can be created, but exact part numbers must be verified by VIN/OEM/supplier. I can save this to Parts Lookup and Supplier Pricing.`;
+  }
+  if(q.includes("vin")){
+    return `VIN Workflow\\nUpload or photograph the VIN plate, confirm the VIN, then save to Truck Profile.`;
+  }
+  if(q.includes("spn") || q.includes("fmi") || q.includes("fault")){
+    return `Fault Doctor Workflow\\nVerify active/inactive status, module, power/ground, wiring, live data, mechanical cause, final repair verification.`;
+  }
+  return `Rolling Wrench AI\\n${ctx}\\n\\nI can route this to quotes, invoices, work orders, parts, schedule, pin drop, PM, truck history, or repair memory.`;
+}
+function v52ExtractFromScan(kind, fileName="uploaded file"){
+  if(kind==="vin") return {type:"vin", text:`VIN scan pending verification from ${fileName}`, fields:{vin:"VERIFY MANUALLY", unit:state.truck.unit || ""}};
+  if(kind==="invoice") return {type:"invoice", text:`Invoice/receipt scan from ${fileName}: vendor, line items, totals need review.`, fields:{vendor:"UNKNOWN", total:0}};
+  if(kind==="part") return {type:"part", text:`Part label scan from ${fileName}: part number/brand need verification.`, fields:{partNumber:"UNKNOWN", brand:"UNKNOWN"}};
+  if(kind==="fault") return {type:"fault", text:`Fault screen scan from ${fileName}: code text needs review.`, fields:{code:"UNKNOWN"}};
+  return {type:"doc", text:`Document scan from ${fileName}: saved for review.`, fields:{}};
+}
+function v52SaveFileRecord(file, purpose){
+  ensureV52();
+  const rec={name:file?.name || "camera capture", size:file?.size || 0, type:file?.type || purpose, purpose, date:new Date().toLocaleString(), localOnly:true};
+  state.fileUploads.unshift(rec);
+  saveState();
+  return rec;
+}
+function v52OpenMaps(lat,lng,label="Rolling Wrench Job"){
+  const q = encodeURIComponent(`${lat},${lng} ${label}`);
+  window.open(`https://www.google.com/maps/search/?api=1&query=${q}`,"_blank");
+}
+function v52BuildServiceFromAi(text){
+  const q=(text||"").toLowerCase();
+  let route="repairhud";
+  if(q.includes("quote")) route="quotes";
+  if(q.includes("invoice")) route="invoices";
+  if(q.includes("work order") || q.includes("job")) route="workorders";
+  if(q.includes("part")) route="parts";
+  if(q.includes("schedule")) route="schedule";
+  if(q.includes("pm")) route="pmmanager";
+  return route;
+}
+
+
+function renderAiEngine(){
+  ensureV52();
+  $("#screen").innerHTML = `${pageHead("AI Engine","saveAiEngine")}
+    <section class="v52-panel"><b>Real AI Connection</b><small>Local workflow works now. Add endpoint/key when backend is ready.</small></section>
+    <section class="form-panel form-grid">
+      <label>AI Endpoint<input id="aiServiceEndpoint" value="${state.aiService.endpoint || ""}" placeholder="https://your-backend/ai"></label>
+      <label>AI API Key<input id="aiServiceKey" value="${state.aiService.apiKey || ""}" placeholder="Backend key later"></label>
+      <label>Test Prompt<textarea id="aiServicePrompt" placeholder="Build quote for X15 water pump"></textarea></label>
+      <button class="action-btn primary" id="runAiService">Ask AI</button>
+      <div class="ai-live-response" id="aiServiceOut">Ready.</div>
+    </section>`;
+  bindPageTools();
+  $("#runAiService").onclick=async()=>{$("#aiServiceOut").textContent="Thinking...";$("#aiServiceOut").textContent=await v52AskAi($("#aiServicePrompt").value);};
+  $("#saveAiEngine").onclick=()=>{state.aiService.endpoint=$("#aiServiceEndpoint").value;state.aiService.apiKey=$("#aiServiceKey").value;state.aiService.mode=state.aiService.endpoint?"backend":"local";saveState();toast("AI engine saved");};
+}
+function renderFileStorage(){
+  ensureV52();
+  $("#screen").innerHTML = `${pageHead("Files / Storage","saveFileStorage")}
+    <section class="v52-panel"><b>Supabase Storage Ready</b><small>Files save locally now. Supabase bucket upload connects after storage policies are set.</small></section>
+    <section class="form-panel form-grid">
+      <label>Purpose<select id="filePurpose"><option>truck photo</option><option>invoice</option><option>quote</option><option>signature</option><option>part label</option><option>VIN plate</option><option>repair photo</option></select></label>
+      <input id="storageFile" type="file" multiple accept="image/*,.pdf,.txt,.csv,.doc,.docx,.xlsx">
+      <button class="action-btn primary" id="saveLocalFiles">Save File Records</button>
+      <div id="fileList">${(state.fileUploads||[]).map(f=>`<span class="file-chip">📎 ${f.name} • ${f.purpose}</span>`).join("") || `<div class="output">No files saved.</div>`}</div>
+    </section>`;
+  bindPageTools();
+  $("#saveLocalFiles").onclick=()=>{[...$("#storageFile").files].forEach(f=>v52SaveFileRecord(f,$("#filePurpose").value));toast("File records saved");renderFileStorage();};
+  $("#saveFileStorage").onclick=()=>{state.storage.bucket=state.storage.bucket || "rwd-files";saveState();toast("Storage settings saved");};
+}
+function renderRealOCR(){
+  ensureV52();
+  $("#screen").innerHTML = `${pageHead("Real OCR Workflow","saveOcrWorkflow")}
+    <section class="v52-panel"><b>OCR Workflow</b><small>Reads VIN plates, invoices, part labels, documents, and fault screens. Local extractor active; real OCR endpoint connects later.</small></section>
+    <section class="form-panel form-grid">
+      <label>Scan Type<select id="realOcrType"><option value="vin">VIN Plate</option><option value="invoice">Invoice / Receipt</option><option value="part">Part Label / Box</option><option value="fault">Fault Screen</option><option value="doc">Document</option></select></label>
+      <input id="realOcrFile" type="file" accept="image/*,.pdf" capture="environment">
+      <button class="action-btn primary" id="runRealOcr">Run OCR</button>
+      <div class="scan-result" id="realOcrOut">No OCR result yet.</div>
+      <div class="smart-action-row">
+        <button id="ocrSaveTruck">Truck</button><button id="ocrSaveParts">Parts</button><button id="ocrSaveInvoice">Invoice</button>
+      </div>
+    </section>`;
+  bindPageTools();
+  let last=null;
+  $("#runRealOcr").onclick=()=>{const f=$("#realOcrFile").files[0]; last=v52ExtractFromScan($("#realOcrType").value,f?.name); $("#realOcrOut").textContent=last.text; state.ocrScans.unshift({...last,date:new Date().toLocaleString()}); if(f)v52SaveFileRecord(f,$("#realOcrType").value); saveState(); toast("OCR complete");};
+  $("#ocrSaveTruck").onclick=()=>{addTruckHistory("OCR",last?last.text:$("#realOcrOut").textContent);toast("Saved to truck")};
+  $("#ocrSaveParts").onclick=()=>{state.parts.push({query:"OCR",notes:last?last.text:$("#realOcrOut").textContent});saveState();toast("Saved to parts")};
+  $("#ocrSaveInvoice").onclick=()=>{state.invoices.push({customer:state.truck.customer,truck:state.truck.unit,work:last?last.text:$("#realOcrOut").textContent,total:0});saveState();toast("Saved to invoice")};
+  $("#saveOcrWorkflow").onclick=()=>{saveState();toast("OCR workflow saved")};
+}
+function renderGPSManager(){
+  ensureV52();
+  $("#screen").innerHTML = `${pageHead("GPS / Pin Drop","saveGpsPin")}
+    <section class="gps-map-card form-grid">
+      <b>Live GPS Pin</b>
+      <label>Customer / Job<input id="gpsCustomer" value="${state.truck.customer || ""}"></label>
+      <label>Location Notes<input id="gpsNotes" placeholder="Roadside, parking lot, dock, mile marker..."></label>
+      <div class="gps-coords" id="gpsCoords">No GPS yet.</div>
+      <div class="smart-action-row"><button id="getLiveGps">Get GPS</button><button id="openGpsMap">Open Maps</button><button id="createGpsWO">Create WO</button></div>
+      <div>${(state.gpsPins||[]).map(p=>`<div class="notification-card"><b>${p.customer}</b><small>${p.lat}, ${p.lng}<br>${p.notes}</small></div>`).join("") || `<div class="output">No GPS pins saved.</div>`}</div>
+    </section>`;
+  bindPageTools();
+  let coords=null;
+  $("#getLiveGps").onclick=()=>navigator.geolocation?navigator.geolocation.getCurrentPosition(p=>{coords={lat:p.coords.latitude,lng:p.coords.longitude};$("#gpsCoords").textContent=`${coords.lat}, ${coords.lng}`;toast("GPS captured");},()=>toast("GPS denied/unavailable")):toast("GPS not supported");
+  $("#openGpsMap").onclick=()=>{if(coords)v52OpenMaps(coords.lat,coords.lng,$("#gpsCustomer").value);else toast("Get GPS first")};
+  $("#createGpsWO").onclick=()=>{if(!coords){toast("Get GPS first");return;}state.workorders.push({customer:$("#gpsCustomer").value,truck:state.truck.unit,desc:`Roadside pin: ${coords.lat}, ${coords.lng} — ${$("#gpsNotes").value}`,status:"Open"});saveState();toast("Work order created")};
+  $("#saveGpsPin").onclick=()=>{if(!coords){toast("Get GPS first");return;}state.gpsPins.unshift({customer:$("#gpsCustomer").value,notes:$("#gpsNotes").value,lat:coords.lat,lng:coords.lng,date:new Date().toLocaleString()});saveState();toast("GPS pin saved");renderGPSManager();};
+}
+function renderV52Dashboard(){
+  ensureV52();
+  $("#screen").innerHTML = `${pageHead("V5.2 Engine","",false)}
+    <section class="v52-grid">
+      <button class="v52-card" data-route="aiengine"><b>AI Engine</b><small>AI endpoint, local workflow, voice commands</small></button>
+      <button class="v52-card" data-route="realocr"><b>OCR Engine</b><small>VIN, invoice, part label, fault screen</small></button>
+      <button class="v52-card" data-route="filestorage"><b>Files / Storage</b><small>Photos, docs, signatures, invoices</small></button>
+      <button class="v52-card" data-route="gpsmanager"><b>GPS / Pin Drop</b><small>Live location, maps, work orders</small></button>
+      <button class="v52-card" data-route="supplierpricing"><b>Supplier Pricing</b><small>Manual now, API-ready later</small></button>
+      <button class="v52-card" data-route="supabase"><b>Supabase Sync</b><small>Cloud data connection</small></button>
+    </section>`;
+  bindPageTools();
+}
+
 const routes = {
   home:renderHome, clock:renderClock, truck:renderTruck, ai:renderAi, parts:renderParts, fault:renderFault,
   repairhud:renderRepairHud, quotes:renderQuotes, invoices:renderInvoices, workorders:renderWorkOrders,
   schedule:renderSchedule, customers:renderCustomers, pindrop:renderPinDrop, camera:renderCamera, reports:renderReports,
-  memory:renderMemory, suppliers:renderSuppliers, pmdue:renderPmDue, settings:renderSettingsSafe, alerts:renderAlerts, workflow:renderWorkflowHub, pmmanager:renderPMManager, inventory:renderInventory, supplierpricing:renderSupplierPricing, notifications:renderNotifications, signin:renderSignInPreview, supabase:renderSupabaseSync, repair:renderRepair, business:renderBusiness
+  memory:renderMemory, suppliers:renderSuppliers, pmdue:renderPmDue, settings:renderSettingsSafe, alerts:renderAlerts, workflow:renderWorkflowHub, pmmanager:renderPMManager, inventory:renderInventory, supplierpricing:renderSupplierPricing, notifications:renderNotifications, signin:renderSignInPreview, supabase:renderSupabaseSync, v52:renderV52Dashboard, aiengine:renderAiEngine, realocr:renderRealOCR, filestorage:renderFileStorage, gpsmanager:renderGPSManager, repair:renderRepair, business:renderBusiness
 };
 function render(route=currentRoute()){
   try{

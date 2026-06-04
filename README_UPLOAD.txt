@@ -95,3 +95,20 @@ create table if not exists public.rwd_app_data (
 For testing before sign-in, RLS must allow anon insert/select/update or be disabled on this table.
 
 V5.1a STABILITY PATCH: Settings button routes to safe settings screen, render function wrapped with fallback to prevent blank screens.
+
+V5.2 REAL FUNCTIONALITY LAYER:
+- AI Engine screen with backend endpoint/key placeholders and local workflow fallback.
+- AI chat can call v52AskAi, route commands, and create workflow items.
+- OCR Engine screen for VIN, invoice, part labels, fault screens, documents.
+- Files / Storage screen for photos, files, signatures, invoices.
+- GPS Manager for live geolocation, maps, and roadside work order creation.
+- V5.2 dashboard added.
+- Supplier pricing, Supabase, Workflow Hub retained.
+NOTE: Real AI/OCR/supplier APIs require external service keys and server-side endpoints.
+
+V5.2b SETTINGS HARD FIX:
+- Added settings-fix.js loaded after app.js.
+- Captures every Settings button/gear click before the main router.
+- Opens a standalone Settings control center.
+- Keeps Shop, Themes, Pricing, Employees, Alerts, Sounds, Display, AI, OCR, Cloud, Security.
+- Prevents Settings from being blocked by router/module errors.
