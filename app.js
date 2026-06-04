@@ -87,16 +87,16 @@ function renderHome(){
       </article>
     </section>
 
-    <div class="rwd-ai-bar" data-route="ai">
+    <div class="rwd-ai-bar clean-ai-bar" data-route="ai">
       <div class="ai-orb">RW</div>
       <div class="ai-copy">
-        <strong>Ask Rolling Wrench AI</strong>
-        <span>+ photos/files • voice • camera • VIN • parts • invoices • documents</span>
+        <strong>Ask anything...</strong>
+        <span>Rolling Wrench AI</span>
       </div>
       <div class="ai-tools">
         <button type="button" data-route="ai">＋</button>
         <button type="button" data-route="ai">🎙</button>
-        <button type="button" data-route="camera">📷</button>
+        <button type="button" data-route="ai">📷</button>
       </div>
     </div>
 
@@ -210,19 +210,56 @@ function renderTruck(){
 }
 
 function renderAi(){
+  if(!state.aiConversations) state.aiConversations = [];
+  if(!state.activeAiId) state.activeAiId = null;
+
+  const active = state.aiConversations.find(c=>c.id===state.activeAiId) || null;
+  const messages = active ? active.messages : [];
+
   $("#screen").innerHTML = `${pageHead("Rolling Wrench AI","saveAi")}
-    <section class="v42-ai-page">
+    <section class="v42-ai-page ai-chat-app">
       <div class="ai-chat-shell">
-        <div class="ai-chat-header">
+        <div class="ai-chat-header chat-style-header">
           <div class="ai-orb">RW</div>
           <div>
-            <h3>Ask Rolling Wrench AI</h3>
-            <p>Voice • camera • photos • files • documents • shop workflow</p>
+            <h3>Ask anything...</h3>
+            <p>Saved conversations • voice • camera • files</p>
           </div>
-          <div class="voice-status"><i class="voice-dot"></i><span id="voiceState">Ready</span></div>
+          <button class="action-btn primary" id="newAiChat">New</button>
         </div>
 
-        <div class="ai-attach-grid">
+        <div class="ai-history-row">
+          <button class="action-btn" id="openAttachMenu">＋ Add</button>
+          <button class="action-btn" id="voiceBtn">🎙 Voice</button>
+          <button class="action-btn" id="quickCamera">📷 Camera</button>
+        </div>
+
+        <div class="ai-chat-layout">
+          <div class="ai-convo-list">
+            <b>Conversations</b>
+            <div id="conversationList">
+              ${state.aiConversations.length ? state.aiConversations.map(c=>`
+                <button class="conversation-item ${c.id===state.activeAiId?'active':''}" data-open-convo="${c.id}">
+                  <span>${c.title || 'Rolling Wrench Chat'}</span>
+                  <small>${c.updated || ''}</small>
+                </button>`).join("") : `<small>No saved chats yet.</small>`}
+            </div>
+          </div>
+
+          <div class="ai-chat-window" id="aiChatWindow">
+            ${messages.length ? messages.map(m=>`
+              <div class="bubble ${m.role}">
+                <b>${m.role === 'user' ? 'You' : 'Rolling Wrench AI'}</b>
+                <p>${m.text}</p>
+              </div>`).join("") : `
+              <div class="bubble assistant">
+                <b>Rolling Wrench AI</b>
+                <p>Ask anything. Use + to add a photo, file, document, invoice, VIN plate, or part label. Conversations save here like ChatGPT.</p>
+              </div>`}
+          </div>
+        </div>
+
+        <div class="attach-menu" id="attachMenu" hidden>
           <button class="ai-attach" id="attachPhoto"><span>🖼</span><b>Add Photo</b></button>
           <button class="ai-attach" id="takePicture"><span>📷</span><b>Take Picture</b></button>
           <button class="ai-attach" id="scanDoc"><span>📄</span><b>Scan Document</b></button>
@@ -234,14 +271,12 @@ function renderAi(){
         <input id="aiFileInput" type="file" accept="image/*,.pdf,.txt,.csv,.doc,.docx,.xlsx" multiple hidden>
         <input id="aiCameraInput" type="file" accept="image/*" capture="environment" hidden>
 
-        <div class="ai-composer">
+        <div class="ai-composer chat-composer">
           <button id="plusAttach" title="Add file">＋</button>
-          <textarea id="aiAsk" placeholder="Ask anything... Example: identify this part, build invoice, decode VIN, SPN 3251 FMI 2, create work order..."></textarea>
-          <button id="voiceBtn" title="Voice">🎙</button>
-          <button id="sendAi" class="hide-small" title="Send">➤</button>
+          <textarea id="aiAsk" placeholder="Ask Rolling Wrench AI anything..."></textarea>
+          <button id="voiceBtn2" title="Voice">🎙</button>
+          <button id="sendAi" title="Send">➤</button>
         </div>
-
-        <div class="ai-response" id="aiOut">Attach a photo, scan a document, use voice, or type a question. Rolling Wrench AI will route it to Truck, Parts, Fault Doctor, Quotes, Invoices, Work Orders, Schedule, Pin Drop, or Repair Memory.</div>
 
         <div class="ai-save-grid">
           <button data-save-ai="truck">Save to Truck</button>
@@ -255,72 +290,119 @@ function renderAi(){
     </section>`;
   bindPageTools();
 
-  const fileInput = $("#aiFileInput");
-  const camInput = $("#aiCameraInput");
-  const attach = label => {
-    fileInput.click();
-    $("#aiOut").textContent = `${label} selected.\n\nAfter upload/scan, Rolling Wrench AI will read it and route it to the correct module.`;
+  function getActiveChat(){
+    let chat = state.aiConversations.find(c=>c.id===state.activeAiId);
+    if(!chat){
+      chat = {id:Date.now().toString(), title:"New Rolling Wrench Chat", updated:new Date().toLocaleString(), messages:[]};
+      state.aiConversations.unshift(chat);
+      state.activeAiId = chat.id;
+    }
+    return chat;
+  }
+
+  function aiReply(q){
+    const text = q.toLowerCase();
+    if(text.includes("invoice")) return "I can help build an invoice. I can save this to the Invoice module and use the active truck/customer when available.";
+    if(text.includes("quote") || text.includes("estimate")) return "I can build a quote and save it under Smart Quotes.";
+    if(text.includes("part") || text.includes("label") || text.includes("box")) return "I can help identify parts and save notes to Parts Lookup. Exact part numbers should be verified by VIN/OEM/supplier.";
+    if(text.includes("vin")) return "I can read or decode VIN information and save it to the active Truck Profile.";
+    if(text.includes("spn") || text.includes("fmi") || text.includes("fault") || text.includes("code")) return "I can route this to Fault Doctor and build a diagnostic workflow.";
+    if(text.includes("schedule")) return "I can create a schedule item and link it to customer/truck/job.";
+    return "Got it. I saved this conversation here. I can route it to Truck, Parts, Fault Doctor, Quotes, Invoices, Work Orders, Schedule, Pin Drop, or Repair Memory.";
+  }
+
+  function sendMessage(){
+    const box = $("#aiAsk");
+    const q = box.value.trim();
+    if(!q) return;
+    const chat = getActiveChat();
+    if(chat.messages.length === 0) chat.title = q.slice(0,34);
+    chat.messages.push({role:"user", text:q, time:new Date().toLocaleString()});
+    chat.messages.push({role:"assistant", text:aiReply(q), time:new Date().toLocaleString()});
+    chat.updated = new Date().toLocaleString();
+    saveState();
+    renderAi();
+  }
+
+  $("#newAiChat").onclick=()=>{
+    const chat = {id:Date.now().toString(), title:"New Rolling Wrench Chat", updated:new Date().toLocaleString(), messages:[]};
+    state.aiConversations.unshift(chat);
+    state.activeAiId = chat.id;
+    saveState();
+    renderAi();
   };
 
-  $("#plusAttach").onclick=()=>attach("Add file/photo/document");
-  $("#attachPhoto").onclick=()=>attach("Photo");
-  $("#scanDoc").onclick=()=>attach("Document");
-  $("#scanInvoice").onclick=()=>attach("Invoice");
+  $$("[data-open-convo]").forEach(btn=>btn.onclick=()=>{
+    state.activeAiId = btn.dataset.openConvo;
+    saveState();
+    renderAi();
+  });
+
+  $("#sendAi").onclick=sendMessage;
+  $("#aiAsk").addEventListener("keydown", e=>{ if(e.key==="Enter" && !e.shiftKey){ e.preventDefault(); sendMessage(); } });
+
+  const fileInput = $("#aiFileInput");
+  const camInput = $("#aiCameraInput");
+  const attachMenu = $("#attachMenu");
+
+  $("#openAttachMenu").onclick=()=>attachMenu.hidden = !attachMenu.hidden;
+  $("#plusAttach").onclick=()=>attachMenu.hidden = !attachMenu.hidden;
+  $("#quickCamera").onclick=()=>camInput.click();
+
+  const attach = label => fileInput.click();
+  $("#attachPhoto").onclick=()=>attach("photo");
+  $("#scanDoc").onclick=()=>attach("document");
+  $("#scanInvoice").onclick=()=>attach("invoice");
   $("#takePicture").onclick=()=>camInput.click();
   $("#scanPart").onclick=()=>camInput.click();
   $("#scanVin").onclick=()=>camInput.click();
 
   fileInput.onchange=()=>{
     const names=[...fileInput.files].map(f=>f.name).join(", ");
-    $("#aiOut").textContent=`Attached: ${names}\n\nAsk what you want me to do with it: identify part, read invoice, decode VIN, build quote, save to job, or create work order.`;
+    const chat = getActiveChat();
+    chat.messages.push({role:"user", text:`Attached file(s): ${names}`, time:new Date().toLocaleString()});
+    chat.messages.push({role:"assistant", text:"File attached. Ask what you want done with it: read invoice, identify part, decode VIN, create quote, create work order, or save to repair memory.", time:new Date().toLocaleString()});
+    chat.updated = new Date().toLocaleString();
+    saveState(); renderAi();
   };
   camInput.onchange=()=>{
     const name=camInput.files[0]?.name || "camera photo";
-    $("#aiOut").textContent=`Captured: ${name}\n\nTell Rolling Wrench AI what this is: VIN plate, part box, fault screen, invoice, damaged part, or document.`;
+    const chat = getActiveChat();
+    chat.messages.push({role:"user", text:`Captured photo: ${name}`, time:new Date().toLocaleString()});
+    chat.messages.push({role:"assistant", text:"Photo captured. Tell me if this is a VIN plate, part label, invoice, fault screen, damaged part, or document.", time:new Date().toLocaleString()});
+    chat.updated = new Date().toLocaleString();
+    saveState(); renderAi();
   };
 
-  $("#voiceBtn").onclick=()=>{
+  function voiceStart(){
     const supported = "webkitSpeechRecognition" in window || "SpeechRecognition" in window;
-    if(!supported){
-      $("#voiceState").textContent="Voice Text";
-      $("#aiOut").textContent="Voice recognition is not available in this browser yet. Tap the text box and use your phone keyboard microphone for now.";
-      return;
-    }
+    if(!supported){ toast("Use phone keyboard mic for voice"); return; }
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     const rec = new SR();
     rec.lang="en-US"; rec.interimResults=false; rec.maxAlternatives=1;
-    $("#voiceState").textContent="Listening";
-    rec.onresult=e=>{ $("#aiAsk").value=e.results[0][0].transcript; $("#voiceState").textContent="Ready"; runAiCommand(); };
-    rec.onerror=()=>{ $("#voiceState").textContent="Ready"; toast("Voice stopped"); };
-    rec.onend=()=>$("#voiceState").textContent="Ready";
+    rec.onresult=e=>{ $("#aiAsk").value=e.results[0][0].transcript; };
+    rec.onerror=()=>toast("Voice stopped");
     rec.start();
+  }
+  $("#voiceBtn").onclick=voiceStart;
+  $("#voiceBtn2").onclick=voiceStart;
+
+  $("#saveAi").onclick=()=>{
+    const chat = getActiveChat();
+    state.notes.push({type:"AI Conversation",note:chat.title,messages:chat.messages,date:new Date().toLocaleString()});
+    saveState(); toast("Conversation saved");
   };
 
-  function runAiCommand(){
-    const q=$("#aiAsk").value.toLowerCase();
-    let dest="repairhud", answer="I can help with that. ";
-    if(q.includes("invoice")){ dest="invoices"; answer+="This should go to Professional Invoices."; }
-    else if(q.includes("quote") || q.includes("estimate")){ dest="quotes"; answer+="This should go to Smart Quotes."; }
-    else if(q.includes("work order") || q.includes("job")){ dest="workorders"; answer+="This should create or update a Work Order."; }
-    else if(q.includes("part") || q.includes("water pump") || q.includes("belt") || q.includes("box") || q.includes("label")){ dest="parts"; answer+="This should go to Parts Lookup."; }
-    else if(q.includes("vin") || q.includes("truck")){ dest="truck"; answer+="This should update the Active Truck / VIN profile."; }
-    else if(q.includes("schedule") || q.includes("appointment")){ dest="schedule"; answer+="This should go to Schedule."; }
-    else if(q.includes("pin") || q.includes("gps") || q.includes("location")){ dest="pindrop"; answer+="This should save a Pin Drop location."; }
-    else if(q.includes("fault") || q.includes("spn") || q.includes("fmi") || q.includes("code")){ dest="fault"; answer+="This should open Fault Doctor."; }
-    $("#aiOut").textContent = `${answer}\n\nRecommended destination: ${dest.toUpperCase()}\n\nNext step: save it below or open that module.`;
-  }
-  $("#sendAi").onclick=runAiCommand;
-  $("#saveAi").onclick=()=>{ state.notes.push({type:"AI",note:$("#aiAsk").value,response:$("#aiOut").textContent,date:new Date().toLocaleString()}); saveState(); toast("AI note saved"); };
-
   $$("[data-save-ai]").forEach(btn=>btn.onclick=()=>{
+    const chat = getActiveChat();
+    const text = chat.messages.map(m=>`${m.role}: ${m.text}`).join("\\n");
     const type=btn.dataset.saveAi;
-    const note={source:"Rolling Wrench AI",note:$("#aiAsk").value,response:$("#aiOut").textContent,date:new Date().toLocaleString()};
-    if(type==="truck"){ state.notes.push({type:"Truck AI",...note}); }
-    if(type==="parts"){ state.parts.push({query:$("#aiAsk").value,notes:$("#aiOut").textContent}); }
-    if(type==="workorders"){ state.workorders.push({customer:state.truck.customer,truck:state.truck.unit,desc:$("#aiAsk").value,status:"Open"}); }
-    if(type==="quotes"){ state.quotes.push({customer:state.truck.customer,desc:$("#aiAsk").value,total:0}); }
-    if(type==="invoices"){ state.invoices.push({customer:state.truck.customer,truck:state.truck.unit,work:$("#aiAsk").value,total:0}); }
-    if(type==="memory"){ state.notes.push({type:"Repair Memory",...note}); }
+    if(type==="truck") state.notes.push({type:"Truck AI",note:text});
+    if(type==="parts") state.parts.push({query:chat.title,notes:text});
+    if(type==="workorders") state.workorders.push({customer:state.truck.customer,truck:state.truck.unit,desc:chat.title,status:"Open"});
+    if(type==="quotes") state.quotes.push({customer:state.truck.customer,desc:chat.title,total:0});
+    if(type==="invoices") state.invoices.push({customer:state.truck.customer,truck:state.truck.unit,work:chat.title,total:0});
+    if(type==="memory") state.notes.push({type:"Repair Memory",note:text});
     saveState(); toast(`Saved to ${type}`);
   });
 }

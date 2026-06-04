@@ -35,3 +35,11 @@ V4.2 UPDATE:
   save AI result to Truck, Parts, Work Orders, Quotes, Invoices, or Repair Memory
 - Added Alerts screen.
 - Home AI bar now shows + / voice / camera intent.
+
+
+V4.3 UPDATE:
+- Home AI bar is now clean: "Ask anything..." with no long example list.
+- Tapping the AI bar opens a ChatGPT-style Rolling Wrench AI chat screen.
+- AI conversations are saved in local storage and shown in a conversation list.
+- + menu supports photo/file/document/invoice/part/VIN/camera workflow.
+- Send button creates saved conversation messages.
