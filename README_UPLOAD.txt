@@ -134,3 +134,5 @@ V6.2a HOTFIX: Added missing ensureSettingsV48/applyUiSettings compatibility func
 V6.2b STARTUP FIX: Added startup-home-fix.js to force Home render immediately on app open, bad hash fallback, and blank-screen recovery.
 
 V6.3 CUSTOMER QUOTE APPROVAL: Send Quotes center, approval links, customer approval portal, approve/decline, signature, status tracking, approved quote creates Work Order, convert to Invoice.
+
+V6.4 INVOICE PAYMENT + CUSTOMER PORTAL: Send Invoices center, invoice portal, sign invoice, paid/unpaid/partial status, payment method tracking, Square payment link placeholder, customer portal hub cleanup.

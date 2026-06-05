@@ -123,6 +123,7 @@ function renderHome(){
 
     <section class="v5-hub-grid">
       <button class="v5-hub-card" data-route="sendquotes"><b>Send Quotes</b><small>Customer approval • signature • status</small></button>
+      <button class="v5-hub-card" data-route="sendinvoices"><b>Send Invoices</b><small>Portal • payments • Square link</small></button>
       <button class="v5-hub-card" data-route="account"><b>Account / Roles</b><small>Login • users • permissions</small></button>
       <button class="v5-hub-card" data-route="dashboard"><b>Business Dashboard</b><small>Revenue • quotes • invoices • jobs</small></button>
       <button class="v5-hub-card" data-route="aioperator"><b>AI Operator</b><small>Ask AI to build anything</small></button>
@@ -802,7 +803,8 @@ function renderInvoices(){
   const v=id=>document.getElementById(id)?.value || "";
   const n=id=>Number(v(id)||0);
   const calc=()=> n("invHours")*n("invRate")+n("invCall")+n("invTravel")+n("invParts")+n("invSupplies")+n("invFees")-n("invDiscount");
-  function buildInvoicePreview(){const labor=n("invHours")*n("invRate");const total=calc();$("#invoicePreviewWrap").innerHTML=`<div class="pro-doc-preview"><div class="pro-doc-top"><div class="pro-doc-logo"><div class="doc-rw">RW</div><div><h3>${state.settings.shop || "Rolling Wrench Diesel"}</h3><p>${state.settings.phone || ""} • Mobile Diesel & Equipment Repair</p></div></div><div class="doc-type"><b>Invoice</b><small>${new Date().toLocaleDateString()}<br>Due Upon Receipt</small></div></div><div class="pro-info-grid"><div class="pro-info-box"><b>Bill To</b><span>${v("invCustomer") || "Customer"}</span></div><div class="pro-info-box"><b>Truck / VIN</b><span>${v("invTruck") || "Truck / VIN"}</span></div><div class="pro-info-box"><b>Work Performed</b><span>${v("invWork") || "Work performed"}</span></div><div class="pro-info-box"><b>Payment</b><span>Due upon receipt unless otherwise agreed. Card processing fees may apply.</span></div></div><table class="pro-table"><thead><tr><th>Description</th><th>Qty/Hours</th><th>Rate/Cost</th><th>Total</th></tr></thead><tbody><tr><td>Labor</td><td>${v("invHours")} hrs</td><td>${money(n("invRate"))}</td><td>${money(labor)}</td></tr><tr><td>Service Call</td><td>1</td><td>${money(n("invCall"))}</td><td>${money(n("invCall"))}</td></tr><tr><td>Travel / Mileage</td><td>1</td><td>${money(n("invTravel"))}</td><td>${money(n("invTravel"))}</td></tr><tr><td>Parts / Materials<br><small>${v("invPartsList").replaceAll("\\n","<br>")}</small></td><td>1</td><td>${money(n("invParts"))}</td><td>${money(n("invParts"))}</td></tr><tr><td>Supplies / Tax / Fees</td><td>1</td><td>${money(n("invSupplies")+n("invFees"))}</td><td>${money(n("invSupplies")+n("invFees"))}</td></tr>${n("invDiscount") ? `<tr><td>Discount</td><td>1</td><td>-${money(n("invDiscount"))}</td><td>-${money(n("invDiscount"))}</td></tr>` : ""}</tbody></table><div class="pro-total-box"><div class="pro-total-row"><span>Subtotal</span><b>${money(total)}</b></div><div class="pro-total-row grand"><span>Total Due</span><b>${money(total)}</b></div></div><div class="pro-note"><b>Notes / Terms:</b> ${v("invNotes") || "Customer authorizes listed work. Additional issues found after teardown or diagnostics may require additional approval. Parts availability and pricing may vary. Payment due upon receipt."}</div>${docSignatureHtml("invoice")}</div><div class="pro-actions"><button id="saveInvoiceAgain">Save Invoice</button><button onclick="window.print()">Print / Save PDF</button><button id="textInvoice">Text/Share Ready</button></div>`;$("#saveInvoiceAgain").onclick=()=>$("#saveInvoice").click();$("#textInvoice").onclick=()=>toast("Use browser share/print or screenshot preview")}
+  function buildInvoicePreview(){const labor=n("invHours")*n("invRate");const total=calc();$("#invoicePreviewWrap").innerHTML=`<div class="pro-doc-preview"><div class="pro-doc-top"><div class="pro-doc-logo"><div class="doc-rw">RW</div><div><h3>${state.settings.shop || "Rolling Wrench Diesel"}</h3><p>${state.settings.phone || ""} • Mobile Diesel & Equipment Repair</p></div></div><div class="doc-type"><b>Invoice</b><small>${new Date().toLocaleDateString()}<br>Due Upon Receipt</small></div></div><div class="pro-info-grid"><div class="pro-info-box"><b>Bill To</b><span>${v("invCustomer") || "Customer"}</span></div><div class="pro-info-box"><b>Truck / VIN</b><span>${v("invTruck") || "Truck / VIN"}</span></div><div class="pro-info-box"><b>Work Performed</b><span>${v("invWork") || "Work performed"}</span></div><div class="pro-info-box"><b>Payment</b><span>Due upon receipt unless otherwise agreed. Card processing fees may apply.</span></div></div><table class="pro-table"><thead><tr><th>Description</th><th>Qty/Hours</th><th>Rate/Cost</th><th>Total</th></tr></thead><tbody><tr><td>Labor</td><td>${v("invHours")} hrs</td><td>${money(n("invRate"))}</td><td>${money(labor)}</td></tr><tr><td>Service Call</td><td>1</td><td>${money(n("invCall"))}</td><td>${money(n("invCall"))}</td></tr><tr><td>Travel / Mileage</td><td>1</td><td>${money(n("invTravel"))}</td><td>${money(n("invTravel"))}</td></tr><tr><td>Parts / Materials<br><small>${v("invPartsList").replaceAll("\\n","<br>")}</small></td><td>1</td><td>${money(n("invParts"))}</td><td>${money(n("invParts"))}</td></tr><tr><td>Supplies / Tax / Fees</td><td>1</td><td>${money(n("invSupplies")+n("invFees"))}</td><td>${money(n("invSupplies")+n("invFees"))}</td></tr>${n("invDiscount") ? `<tr><td>Discount</td><td>1</td><td>-${money(n("invDiscount"))}</td><td>-${money(n("invDiscount"))}</td></tr>` : ""}</tbody></table><div class="pro-total-box"><div class="pro-total-row"><span>Subtotal</span><b>${money(total)}</b></div><div class="pro-total-row grand"><span>Total Due</span><b>${money(total)}</b></div></div><div class="pro-note"><b>Notes / Terms:</b> ${v("invNotes") || "Customer authorizes listed work. Additional issues found after teardown or diagnostics may require additional approval. Parts availability and pricing may vary. Payment due upon receipt."}</div>${docSignatureHtml("invoice")}</div><div class="pro-actions"><button id="saveInvoiceAgain">Save Invoice</button><button id="sendInvoiceCustomer">Send to Customer</button><button onclick="window.print()">Print / Save PDF</button><button id="textInvoice">Text/Share Ready</button></div>`;if($("#sendInvoiceCustomer")) $("#sendInvoiceCustomer").onclick=()=>{ $("#saveInvoice").click(); const idx=state.invoices.length-1; makeInvoiceLink(idx); toast("Invoice link ready"); setRoute("sendinvoices"); };
+    $("#saveInvoiceAgain").onclick=()=>$("#saveInvoice").click();$("#textInvoice").onclick=()=>toast("Use browser share/print or screenshot preview")}
   $("#previewInv").onclick=buildInvoicePreview;
   $("#saveInvoice").onclick=()=>{state.invoices.push({customer:v("invCustomer"),truck:v("invTruck"),work:v("invWork"),parts:v("invPartsList"),notes:v("invNotes"),total:calc(),date:new Date().toLocaleString()});addTruckHistory("Invoice", `${v("invWork")} - ${money(calc())}`);saveState();toast("Invoice saved")};
 }
@@ -2105,11 +2107,142 @@ function renderQuoteSendCenter(){
   $$("[data-convert-invoice]").forEach(btn=>btn.onclick=()=>{const q=state.quotes[Number(btn.dataset.convertInvoice)];if(!q)return;state.invoices.push({customer:q.customer,truck:q.truck,work:q.desc,total:q.total,date:new Date().toLocaleString(),fromQuote:true,quoteId:q.approvalId||""});saveState();toast("Converted to invoice");});
 }
 
+
+function ensureV64(){
+  if(typeof ensureV63 === "function") ensureV63();
+  if(!state.invoiceLinks) state.invoiceLinks = [];
+  if(!state.payments) state.payments = [];
+}
+function invoiceStatusPill(status){
+  const s=(status || "Unpaid").toLowerCase();
+  return `<span class="invoice-status-pill ${s}">${status || "Unpaid"}</span>`;
+}
+function makeInvoiceLink(invoiceIndex){
+  ensureV64();
+  const inv = state.invoices[invoiceIndex];
+  if(!inv) return null;
+  const id = inv.invoiceId || ("RWI-" + Date.now());
+  inv.invoiceId = id;
+  inv.status = inv.status || "Unpaid";
+  const link = `${location.origin}${location.pathname}#invoiceportal-${id}`;
+  let rec = state.invoiceLinks.find(x=>x.id===id);
+  if(!rec){
+    rec={id,invoiceIndex,link,status:inv.status,customer:inv.customer||"",total:inv.total||0,created:new Date().toLocaleString()};
+    state.invoiceLinks.unshift(rec);
+  }else{
+    Object.assign(rec,{invoiceIndex,link,status:inv.status,customer:inv.customer||"",total:inv.total||0});
+  }
+  saveState();
+  return {id,link,invoice:inv};
+}
+function findInvoiceById(id){
+  ensureV64();
+  let index = state.invoices.findIndex(i=>i.invoiceId===id);
+  if(index < 0){
+    const rec = state.invoiceLinks.find(x=>x.id===id);
+    if(rec) index = rec.invoiceIndex;
+  }
+  return {invoice:index>=0 ? state.invoices[index] : null,index};
+}
+function setInvoicePayment(id,status,amount,method,notes){
+  const f=findInvoiceById(id);
+  if(!f.invoice) return false;
+  f.invoice.status=status;
+  f.invoice.paidAmount=Number(amount||0);
+  f.invoice.paymentMethod=method||"";
+  f.invoice.paymentNotes=notes||"";
+  f.invoice.paymentUpdated=new Date().toLocaleString();
+  const rec=state.invoiceLinks.find(x=>x.id===id);
+  if(rec) Object.assign(rec,{status,total:f.invoice.total||0,paidAmount:f.invoice.paidAmount,paymentUpdated:f.invoice.paymentUpdated});
+  state.payments.unshift({invoiceId:id,status,amount:Number(amount||0),method,notes,date:new Date().toLocaleString(),customer:f.invoice.customer});
+  saveState();
+  return true;
+}
+function customerPortalLegal(){
+  return "Customer portal actions are recorded with date/time. Approval, signatures, payment status, photos, and GPS pins should be reviewed before final billing.";
+}
+function renderInvoicePortal(id){
+  ensureV64();
+  const f=findInvoiceById(id), inv=f.invoice;
+  if(!inv){
+    $("#screen").innerHTML=`${pageHead("Invoice Portal","",false)}<section class="error-panel"><b>Invoice Not Found</b><p>This invoice link does not match a saved invoice on this device yet.</p></section>`;
+    bindPageTools();
+    return;
+  }
+  $("#screen").innerHTML=`${pageHead("Invoice Portal","",false)}
+  <section class="invoice-portal-card">
+    <div class="approval-header"><div class="approval-logo">RW</div><div><h2>Invoice</h2><p>Rolling Wrench Diesel LLC</p></div></div>
+    <div>${invoiceStatusPill(inv.status || "Unpaid")}</div>
+    <div class="approval-summary">
+      <div class="approval-box"><b>Customer</b><span>${inv.customer || "Customer"}</span></div>
+      <div class="approval-box"><b>Truck / VIN</b><span>${inv.truck || state.truck.unit || "Truck"}</span></div>
+      <div class="approval-box"><b>Work Performed</b><span>${inv.work || "Invoice work"}</span></div>
+      <div class="approval-box"><b>Total Due</b><span>${money(inv.total || 0)}</span></div>
+    </div>
+    <div class="approval-legal"><b>Invoice Terms:</b><br>Payment is due upon receipt unless otherwise agreed. Card processing fees may apply. Additional work not listed requires approval.</div>
+    ${typeof signatureBlock==="function" ? signatureBlock("customerInvoice","Customer / Driver Invoice Signature") : ""}
+    <div class="payment-box">
+      <b>Payment Tracking</b>
+      <div class="two-col">
+        <label>Amount Paid<input id="payAmount" type="number" step=".01" value="${inv.paidAmount || inv.total || 0}"></label>
+        <label>Payment Method<select id="payMethod"><option>Square</option><option>Card</option><option>Cash</option><option>Check</option><option>ACH</option><option>Fleet Account</option><option>Other</option></select></label>
+      </div>
+      <label>Payment Notes<textarea id="payNotes">${inv.paymentNotes || ""}</textarea></label>
+      <label>Square Payment Link<input id="squarePayLink" placeholder="Paste Square payment link here" value="${inv.squareLink || ""}"></label>
+      <div class="payment-actions">
+        <button class="paid" id="markPaid">Mark Paid</button>
+        <button class="partial" id="markPartial">Partial</button>
+        <button class="unpaid" id="markUnpaid">Unpaid</button>
+      </div>
+      <button class="action-btn primary" style="width:100%;margin-top:8px;" id="openSquareLink">Open Square Link</button>
+    </div>
+  </section>`;
+  bindPageTools();
+  if(typeof setupSignaturePad==="function") setupSignaturePad("customerInvoice");
+  const savePay=(status)=>{ 
+    const sig = typeof saveSignature==="function" ? saveSignature("customerInvoice") : null;
+    inv.invoiceSignature=sig;
+    inv.squareLink=$("#squarePayLink").value;
+    if(setInvoicePayment(id,status,$("#payAmount").value,$("#payMethod").value,$("#payNotes").value)){toast("Invoice updated");renderInvoicePortal(id);}
+  };
+  $("#markPaid").onclick=()=>savePay("Paid");
+  $("#markPartial").onclick=()=>savePay("Partial");
+  $("#markUnpaid").onclick=()=>savePay("Unpaid");
+  $("#openSquareLink").onclick=()=>{const u=$("#squarePayLink").value;if(u) window.open(u,"_blank"); else toast("Paste Square link first");};
+}
+function renderInvoiceSendCenter(){
+  ensureV64();
+  $("#screen").innerHTML=`${pageHead("Send Invoices","",false)}
+  <section class="form-panel">
+    <div class="backend-banner"><b>Customer Invoice Portal</b><small>Send invoice links for viewing, signing, payment tracking, and Square payment link.</small></div>
+    ${(state.invoices||[]).length ? state.invoices.map((inv,i)=>`<div class="quote-list-card"><b>${inv.customer || "Customer"} — ${money(inv.total || 0)}</b><small>${inv.work || "Invoice"}<br>${invoiceStatusPill(inv.status || "Unpaid")}</small><div class="smart-action-row"><button data-create-invoice-link="${i}">Send Link</button><button data-open-invoice="${inv.invoiceId || ""}">Open Portal</button><button data-mark-paid="${i}">Paid</button></div><div class="share-link-box" id="invoiceLink_${i}">${inv.invoiceId ? `${location.origin}${location.pathname}#invoiceportal-${inv.invoiceId}` : "No link yet"}</div></div>`).join("") : `<div class="output">No invoices saved yet.</div>`}
+  </section>`;
+  bindPageTools();
+  $$("[data-create-invoice-link]").forEach(btn=>btn.onclick=()=>{const i=Number(btn.dataset.createInvoiceLink);const link=makeInvoiceLink(i);$("#invoiceLink_"+i).textContent=link.link;toast("Invoice link ready");renderInvoiceSendCenter();});
+  $$("[data-open-invoice]").forEach(btn=>btn.onclick=()=>{const id=btn.dataset.openInvoice;if(!id){toast("Create link first");return;}setRoute("invoiceportal-"+id);});
+  $$("[data-mark-paid]").forEach(btn=>btn.onclick=()=>{const i=Number(btn.dataset.markPaid);const link=makeInvoiceLink(i);setInvoicePayment(link.id,"Paid",state.invoices[i].total||0,"Manual","Marked paid from Send Invoices");toast("Marked paid");renderInvoiceSendCenter();});
+}
+function renderCustomerPortalHub(){
+  ensureV64();
+  $("#screen").innerHTML=`${pageHead("Customer Portal","",false)}
+  <section class="form-panel">
+    <div class="backend-banner"><b>Customer Portal Hub</b><small>Quote approval, invoice view/payment, send location, upload photos.</small></div>
+    <div class="portal-hub-grid">
+      <button class="portal-hub-btn" data-route="sendquotes"><b>Approve Quote</b><small>View, approve, decline, sign</small></button>
+      <button class="portal-hub-btn" data-route="sendinvoices"><b>View Invoice</b><small>Sign, payment status, Square link</small></button>
+      <button class="portal-hub-btn" data-route="gpsmanager"><b>Send Location</b><small>GPS pin / roadside</small></button>
+      <button class="portal-hub-btn" data-route="filestorage"><b>Upload Photos</b><small>Truck, damage, parts, documents</small></button>
+    </div>
+    <div class="approval-legal">${customerPortalLegal()}</div>
+  </section>`;
+  bindPageTools();
+}
+
 const routes = {
   home:renderHome, clock:renderClock, truck:renderTruck, ai:renderAi, parts:renderParts, fault:renderFault,
   repairhud:renderRepairHud, quotes:renderQuotes, invoices:renderInvoices, workorders:renderWorkOrders,
   schedule:renderSchedule, customers:renderCustomers, pindrop:renderPinDrop, camera:renderCamera, reports:renderReports,
-  memory:renderMemory, suppliers:renderSuppliers, pmdue:renderPmDue, settings:renderSettingsSafe, alerts:renderAlerts, workflow:renderWorkflowHub, pmmanager:renderPMManager, inventory:renderInventory, supplierpricing:renderSupplierPricing, notifications:renderNotifications, signin:renderSignInPreview, supabase:renderSupabaseSync, v52:renderV52Dashboard, dashboard:renderBusinessDashboard, aioperator:renderAIOperator, photointel:renderPhotoIntelligence, schedulecommand:renderScheduleCommand, customerportal:renderCustomerPortal, sendquotes:renderQuoteSendCenter, techmode:renderTechMode, about:renderAboutLegal, login:renderLogin, account:renderAuthSettings, aiengine:renderAiEngine, realocr:renderRealOCR, filestorage:renderFileStorage, gpsmanager:renderGPSManager, repair:renderRepair, business:renderBusiness
+  memory:renderMemory, suppliers:renderSuppliers, pmdue:renderPmDue, settings:renderSettingsSafe, alerts:renderAlerts, workflow:renderWorkflowHub, pmmanager:renderPMManager, inventory:renderInventory, supplierpricing:renderSupplierPricing, notifications:renderNotifications, signin:renderSignInPreview, supabase:renderSupabaseSync, v52:renderV52Dashboard, dashboard:renderBusinessDashboard, aioperator:renderAIOperator, photointel:renderPhotoIntelligence, schedulecommand:renderScheduleCommand, customerportal:renderCustomerPortalHub, sendquotes:renderQuoteSendCenter, sendinvoices:renderInvoiceSendCenter, portalhub:renderCustomerPortalHub, techmode:renderTechMode, about:renderAboutLegal, login:renderLogin, account:renderAuthSettings, aiengine:renderAiEngine, realocr:renderRealOCR, filestorage:renderFileStorage, gpsmanager:renderGPSManager, repair:renderRepair, business:renderBusiness
 };
 function render(route=currentRoute()){
   try{
@@ -2121,6 +2254,7 @@ function render(route=currentRoute()){
       return;
     }
     if(route && route.startsWith("quoteapproval-")){ renderQuoteApprovalPortal(route.replace("quoteapproval-","")); return; }
+    if(route && route.startsWith("invoiceportal-")){ renderInvoicePortal(route.replace("invoiceportal-","")); return; }
     const fn=routes[route] || renderHome;
     fn();
     $$(".bottom-nav button").forEach(b=>b.classList.toggle("active", b.dataset.route===route || (route==="home" && b.dataset.route==="home")));

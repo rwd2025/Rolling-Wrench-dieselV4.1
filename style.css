@@ -794,3 +794,74 @@ body.high-contrast{--line:#ffffff;--muted:#e9eef5}
 .approval-actions{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:12px}.approval-actions button{border:1px solid rgba(104,121,139,.45);background:linear-gradient(145deg,#17222f,#0d131b);color:white;border-radius:14px;padding:13px;font-weight:900;text-transform:uppercase}.approval-actions .approve{background:linear-gradient(145deg,#29d66f,#0d7f3a);border-color:#29d66f}.approval-actions .decline{background:linear-gradient(145deg,#b63838,#5d1515);border-color:#b63838}
 .share-link-box{border:1px dashed rgba(57,168,255,.55);background:#071018;color:#dcecff;border-radius:14px;padding:10px;word-break:break-word;margin-top:10px}.quote-list-card{border:1px solid rgba(104,121,139,.35);background:#0a1017;border-radius:16px;padding:11px;margin-bottom:8px}.quote-list-card b{display:block;color:#fff}.quote-list-card small{display:block;color:var(--muted);margin-top:4px}
 @media(max-width:520px){.approval-summary,.approval-actions{grid-template-columns:1fr}}
+
+
+/* ===== V6.4 INVOICE PAYMENT + CUSTOMER PORTAL CLEANUP ===== */
+.invoice-status-pill{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  padding:7px 10px;
+  border-radius:999px;
+  border:1px solid rgba(104,121,139,.45);
+  background:#0a1017;
+  color:#fff;
+  font-size:12px;
+  font-weight:900;
+  text-transform:uppercase;
+}
+.invoice-status-pill.unpaid{border-color:#ff7a7a;color:#ff7a7a}
+.invoice-status-pill.partial{border-color:#f2b84b;color:#f2b84b}
+.invoice-status-pill.paid{border-color:var(--green);color:var(--green)}
+.invoice-portal-card{
+  border:1px solid rgba(57,168,255,.48);
+  background:linear-gradient(145deg,#17202b,#070b10);
+  border-radius:22px;
+  padding:14px;
+  box-shadow:var(--shadow);
+}
+.portal-hub-grid{
+  display:grid;
+  grid-template-columns:repeat(2,1fr);
+  gap:10px;
+}
+.portal-hub-btn{
+  border:1px solid rgba(104,121,139,.42);
+  background:linear-gradient(145deg,#17222f,#0d131b);
+  color:white;
+  border-radius:18px;
+  padding:14px;
+  text-align:left;
+}
+.portal-hub-btn b{display:block;color:var(--orange);text-transform:uppercase;letter-spacing:1px}
+.portal-hub-btn small{display:block;color:var(--muted);margin-top:5px}
+.payment-box{
+  border:1px solid rgba(104,121,139,.38);
+  background:#0a1017;
+  border-radius:16px;
+  padding:12px;
+  margin-top:10px;
+}
+.payment-box b{display:block;color:#fff}
+.payment-box small{display:block;color:var(--muted);margin-top:4px}
+.payment-actions{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:8px;
+  margin-top:10px;
+}
+.payment-actions button{
+  border:1px solid rgba(104,121,139,.45);
+  background:linear-gradient(145deg,#17222f,#0d131b);
+  color:white;
+  border-radius:13px;
+  padding:11px 8px;
+  font-weight:900;
+  text-transform:uppercase;
+}
+.payment-actions .paid{border-color:var(--green)}
+.payment-actions .partial{border-color:#f2b84b}
+.payment-actions .unpaid{border-color:#ff7a7a}
+@media(max-width:520px){
+  .portal-hub-grid,.payment-actions{grid-template-columns:1fr}
+}
