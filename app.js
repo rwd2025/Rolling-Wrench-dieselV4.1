@@ -1943,6 +1943,64 @@ function renderAuthSettings(){
   $("#authLogout").onclick=()=>{logoutAuth();toast("Logged out");setRoute("login");};
 }
 
+
+/* V6.2a compatibility hotfix */
+if(typeof ensureSettingsV48 !== "function"){
+  function ensureSettingsV48(){
+    state.ui = state.ui || {
+      theme:"orange",
+      background:"diamond",
+      compact:false,
+      largeText:false,
+      highContrast:false,
+      showEarnings:true,
+      showSchedule:true,
+      showRecentJobs:true,
+      showSystemStatus:true
+    };
+    state.pricing = state.pricing || {
+      shopLabor:135,
+      mobileLabor:135,
+      diagnostic:150,
+      roadside:150,
+      serviceCall:250,
+      mileage:0,
+      shopSuppliesPct:0,
+      envFee:0,
+      cardPct:0,
+      taxPct:0,
+      afterHoursMultiplier:1.5,
+      weekendMultiplier:1.5,
+      holidayMultiplier:2
+    };
+    state.employees = state.employees || [
+      {name:"James Jacobs", role:"Owner / Admin", laborRate:135},
+      {name:"Stephani Jacobs", role:"Operations Manager", laborRate:135},
+      {name:"David", role:"Technician", laborRate:135}
+    ];
+    state.alertSettings = state.alertSettings || {pm:true,schedule:true,invoice:true,quote:true,clock:true,truck:true};
+    state.soundSettings = state.soundSettings || {button:true,save:true,aiVoice:true,notification:true,clockIn:true,clockOut:true,volume:80};
+    state.aiSettings = state.aiSettings || {voice:true,voiceSpeed:1,voiceType:"Shop Pro",autoRead:false,saveConversations:true,rememberTruck:true,rememberCustomer:true};
+    state.ocrSettings = state.ocrSettings || {autoOcr:false,vin:true,part:true,invoice:true,fault:true};
+    state.security = state.security || {appLock:false,pin:"",faceId:false,touchId:false};
+  }
+}
+if(typeof applyUiSettings !== "function"){
+  function applyUiSettings(){
+    if(typeof ensureSettingsV48 === "function") ensureSettingsV48();
+    document.body.classList.remove("theme-green","theme-blue","theme-red","theme-gray","theme-light","compact-mode","large-text","high-contrast");
+    const t = state.ui && state.ui.theme;
+    if(t==="green") document.body.classList.add("theme-green");
+    if(t==="blue") document.body.classList.add("theme-blue");
+    if(t==="red") document.body.classList.add("theme-red");
+    if(t==="gray") document.body.classList.add("theme-gray");
+    if(t==="light") document.body.classList.add("theme-light");
+    if(state.ui && state.ui.compact) document.body.classList.add("compact-mode");
+    if(state.ui && state.ui.largeText) document.body.classList.add("large-text");
+    if(state.ui && state.ui.highContrast) document.body.classList.add("high-contrast");
+  }
+}
+
 const routes = {
   home:renderHome, clock:renderClock, truck:renderTruck, ai:renderAi, parts:renderParts, fault:renderFault,
   repairhud:renderRepairHud, quotes:renderQuotes, invoices:renderInvoices, workorders:renderWorkOrders,

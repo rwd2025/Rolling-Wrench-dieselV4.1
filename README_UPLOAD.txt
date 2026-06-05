@@ -128,3 +128,5 @@ NOTE: This is frontend/platform ready. Live AI/OCR/payment/customer portal publi
 V6.1 CLOCK FIX: Rebuilt clock to use stored start timestamps, pause/stop base seconds, and live elapsed time. Start no longer resets/recalculates wrong.
 
 V6.2 AUTH + DATABASE FOUNDATION: Supabase Auth sign-in/create/forgot hooks, Local Demo Mode, Account/Roles screen, role placeholders, protected route logic, logout.
+
+V6.2a HOTFIX: Added missing ensureSettingsV48/applyUiSettings compatibility functions so Home loads correctly.
