@@ -130,3 +130,5 @@ V6.1 CLOCK FIX: Rebuilt clock to use stored start timestamps, pause/stop base se
 V6.2 AUTH + DATABASE FOUNDATION: Supabase Auth sign-in/create/forgot hooks, Local Demo Mode, Account/Roles screen, role placeholders, protected route logic, logout.
 
 V6.2a HOTFIX: Added missing ensureSettingsV48/applyUiSettings compatibility functions so Home loads correctly.
+
+V6.2b STARTUP FIX: Added startup-home-fix.js to force Home render immediately on app open, bad hash fallback, and blank-screen recovery.

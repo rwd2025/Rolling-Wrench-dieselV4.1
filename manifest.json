@@ -1,6 +1,6 @@
 {
-  "name": "Rolling Wrench AI Command Center V6.2a Hotfix",
-  "short_name": "RWD AI V6.2a",
+  "name": "Rolling Wrench AI Command Center V6.2b Startup Fix",
+  "short_name": "RWD AI V6.2b",
   "start_url": "./",
   "display": "standalone",
   "background_color": "#07090d",
