@@ -1,6 +1,6 @@
 {
-  "name": "Rolling Wrench AI Command Center V6.5 Stability",
-  "short_name": "RWD AI V6.5",
+  "name": "Rolling Wrench AI Command Center V6.6 Backend",
+  "short_name": "RWD AI V6.6",
   "start_url": "./",
   "display": "standalone",
   "background_color": "#07090d",

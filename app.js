@@ -126,6 +126,7 @@ function renderHome(){
       <button class="v5-hub-card" data-route="sendinvoices"><b>Send Invoices</b><small>Portal • payments • Square link</small></button>
       <button class="v5-hub-card" data-route="stability"><b>Stability Center</b><small>Button test • health check</small></button>
       <button class="v5-hub-card" data-route="externallinks"><b>External Links</b><small>Supabase customer links</small></button>
+      <button class="v5-hub-card" data-route="backend"><b>Backend Center</b><small>Tables • storage • AI • OCR</small></button>
       <button class="v5-hub-card" data-route="account"><b>Account / Roles</b><small>Login • users • permissions</small></button>
       <button class="v5-hub-card" data-route="dashboard"><b>Business Dashboard</b><small>Revenue • quotes • invoices • jobs</small></button>
       <button class="v5-hub-card" data-route="aioperator"><b>AI Operator</b><small>Ask AI to build anything</small></button>
@@ -2316,11 +2317,238 @@ function renderStoragePrep(){
   $("#saveStoragePrep").onclick=()=>{saveState();toast("Storage queue saved");};
 }
 
+
+function ensureV66(){
+  if(typeof ensureV65 === "function") ensureV65();
+  if(!state.backend) state.backend = {
+    bucket:"rwd-files",
+    shopId:"",
+    aiEndpoint:"",
+    aiKey:"",
+    ocrEndpoint:"",
+    ocrKey:"",
+    squareLink:"",
+    smsProvider:"manual"
+  };
+}
+async function v66Select(table, query="select=*&limit=1"){
+  ensureSupabaseConfigured();
+  return await supabaseRest(`${table}?${query}`,"GET");
+}
+async function v66Insert(table, payload){
+  ensureSupabaseConfigured();
+  return await supabaseRest(table,"POST",payload);
+}
+async function v66UpsertAppData(kind, item){
+  const payload = {
+    shop_id: state.backend.shopId || null,
+    user_id: null,
+    app_kind: kind,
+    local_id: item.id || item.local_id || item.vin || item.invoiceId || item.approvalId || Date.now().toString(),
+    payload: item,
+    updated_at: new Date().toISOString()
+  };
+  return await v66Insert("rwd_app_data", payload);
+}
+async function v66SyncCoreData(){
+  const packs=[
+    ["customers",state.customers||[]],
+    ["trucks",state.trucks||[]],
+    ["workorders",state.workorders||[]],
+    ["quotes",state.quotes||[]],
+    ["invoices",state.invoices||[]],
+    ["schedule",state.schedule||[]],
+    ["pmRecords",state.pmRecords||[]],
+    ["inventory",state.inventory||[]],
+    ["externalLinks",state.externalLinks||[]],
+    ["storageQueue",state.storageQueue||[]]
+  ];
+  const log=[];
+  for(const [kind,items] of packs){
+    let ok=0,fail=0;
+    for(const item of items){
+      try{await v66UpsertAppData(kind,item);ok++;}catch(e){fail++;log.push(`${kind} fail: ${e.message}`);}
+    }
+    log.push(`${kind}: ${ok} synced, ${fail} failed`);
+  }
+  state.supabase.lastSync=new Date().toLocaleString();
+  saveState();
+  return log.join("\n");
+}
+async function v66CreateCustomerLink(rec){
+  const payload={
+    shop_id: state.backend.shopId || null,
+    link_type: rec.kind || rec.link_type || "portal",
+    local_id: rec.id || rec.local_id || Date.now().toString(),
+    customer: rec.customer || rec.label || "",
+    status: rec.status || "Ready",
+    payload: rec
+  };
+  return await v66Insert("customer_links", payload);
+}
+async function v66SyncCustomerLinks(){
+  ensureV66();
+  const log=[];
+  for(const rec of (state.externalLinks||[])){
+    try{await v66CreateCustomerLink(rec);rec.synced=true;rec.syncedAt=new Date().toLocaleString();log.push(`${rec.label||rec.id}: synced`);}
+    catch(e){rec.error=e.message;log.push(`${rec.label||rec.id}: ${e.message}`);}
+  }
+  saveState();
+  return log.join("\n");
+}
+async function v66PrepareStorageRecords(){
+  ensureV66();
+  const log=[];
+  for(const rec of (state.storageQueue||[])){
+    const row={
+      shop_id: state.backend.shopId || null,
+      local_id: rec.id,
+      file_name: rec.fileName,
+      file_path: `${state.backend.bucket}/${rec.id}-${rec.fileName}`,
+      public_url: "",
+      purpose: rec.purpose,
+      payload: rec
+    };
+    try{await v66Insert("file_records",row);rec.status="Record Saved";rec.recordSavedAt=new Date().toLocaleString();log.push(`${rec.fileName}: record saved`);}
+    catch(e){rec.error=e.message;log.push(`${rec.fileName}: ${e.message}`);}
+  }
+  saveState();
+  return log.join("\n");
+}
+async function v66AskRealAi(prompt){
+  ensureV66();
+  if(!state.backend.aiEndpoint) return await v52AskAi(prompt);
+  const res = await fetch(state.backend.aiEndpoint,{
+    method:"POST",
+    headers:{"Content-Type":"application/json","Authorization":"Bearer "+(state.backend.aiKey||"")},
+    body:JSON.stringify({prompt, context:{truck:state.truck, settings:state.settings, shop:state.auth?.shop}})
+  });
+  const data = await res.json();
+  return data.answer || data.text || JSON.stringify(data);
+}
+async function v66RunRealOcr(payload){
+  ensureV66();
+  if(!state.backend.ocrEndpoint) return {text:"OCR endpoint not configured. Local OCR workflow ready.",payload};
+  const res = await fetch(state.backend.ocrEndpoint,{
+    method:"POST",
+    headers:{"Content-Type":"application/json","Authorization":"Bearer "+(state.backend.ocrKey||"")},
+    body:JSON.stringify(payload)
+  });
+  return await res.json();
+}
+
+
+function renderBackendCenter(){
+  ensureV66();
+  const cards=[
+    ["Supabase URL", state.supabase?.url ? "good":"bad", state.supabase?.url || "Missing"],
+    ["Anon Key", state.supabase?.anonKey ? "good":"bad", state.supabase?.anonKey ? "Configured" : "Missing"],
+    ["Shop ID", state.backend.shopId ? "good":"warn", state.backend.shopId || "Optional until shops table is used"],
+    ["Storage Bucket", state.backend.bucket ? "good":"warn", state.backend.bucket || "rwd-files"],
+    ["AI Endpoint", state.backend.aiEndpoint ? "good":"warn", state.backend.aiEndpoint || "Local AI fallback"],
+    ["OCR Endpoint", state.backend.ocrEndpoint ? "good":"warn", state.backend.ocrEndpoint || "Local OCR fallback"]
+  ];
+  $("#screen").innerHTML=`${pageHead("Backend Center","saveBackend")}
+  <section class="backend-status-grid">${cards.map(c=>`<div class="backend-status-card ${c[1]}"><b>${c[0]}</b><small>${c[2]}</small></div>`).join("")}</section>
+  <section class="form-panel form-grid">
+    <label>Shop ID<input id="backendShopId" value="${state.backend.shopId||""}" placeholder="Supabase shops.id later"></label>
+    <label>Storage Bucket<input id="backendBucket" value="${state.backend.bucket||"rwd-files"}"></label>
+    <label>AI Endpoint<input id="backendAiEndpoint" value="${state.backend.aiEndpoint||""}" placeholder="https://your-ai-backend"></label>
+    <label>AI Key<input id="backendAiKey" value="${state.backend.aiKey||""}"></label>
+    <label>OCR Endpoint<input id="backendOcrEndpoint" value="${state.backend.ocrEndpoint||""}" placeholder="https://your-ocr-backend"></label>
+    <label>OCR Key<input id="backendOcrKey" value="${state.backend.ocrKey||""}"></label>
+    <label>Square Payment Link<input id="backendSquare" value="${state.backend.squareLink||""}" placeholder="Paste default Square payment link"></label>
+    <div class="backend-action-grid">
+      <button id="testTables">Test Tables</button>
+      <button id="syncCoreData">Sync Core Data</button>
+      <button id="syncCustomerLinks">Sync Customer Links</button>
+      <button id="prepareStorageRows">Prepare Storage Rows</button>
+      <button data-route="backendsetup">SQL Setup</button>
+      <button data-route="stability">Stability Center</button>
+    </div>
+    <div class="upload-progress" id="backendLog">Ready.</div>
+  </section>`;
+  bindPageTools();
+  $("#saveBackend").onclick=()=>{state.backend.shopId=$("#backendShopId").value;state.backend.bucket=$("#backendBucket").value||"rwd-files";state.backend.aiEndpoint=$("#backendAiEndpoint").value;state.backend.aiKey=$("#backendAiKey").value;state.backend.ocrEndpoint=$("#backendOcrEndpoint").value;state.backend.ocrKey=$("#backendOcrKey").value;state.backend.squareLink=$("#backendSquare").value;saveState();toast("Backend saved");};
+  $("#testTables").onclick=async()=>{const log=[];for(const t of ["shops","profiles","rwd_app_data","customer_links","file_records"]){try{await v66Select(t);log.push(`${t}: OK`);}catch(e){log.push(`${t}: ${e.message}`);}}$("#backendLog").textContent=log.join("\n");};
+  $("#syncCoreData").onclick=async()=>{$("#backendLog").textContent="Syncing...";try{$("#backendLog").textContent=await v66SyncCoreData();toast("Core sync done");}catch(e){$("#backendLog").textContent=e.message;toast("Sync failed");}};
+  $("#syncCustomerLinks").onclick=async()=>{$("#backendLog").textContent="Syncing links...";try{$("#backendLog").textContent=await v66SyncCustomerLinks();toast("Links synced");}catch(e){$("#backendLog").textContent=e.message;toast("Link sync failed");}};
+  $("#prepareStorageRows").onclick=async()=>{$("#backendLog").textContent="Preparing storage rows...";try{$("#backendLog").textContent=await v66PrepareStorageRecords();toast("Storage rows ready");}catch(e){$("#backendLog").textContent=e.message;toast("Storage prep failed");}};
+}
+function renderBackendSetup(){
+  $("#screen").innerHTML=`${pageHead("Supabase SQL Setup","",false)}
+  <section class="backend-banner"><b>Run This SQL</b><small>Open Supabase SQL Editor and run the setup. Then create Storage bucket: rwd-files.</small></section>
+  <section class="sql-box">${`create extension if not exists "pgcrypto";
+
+create table if not exists public.shops (
+  id uuid primary key default gen_random_uuid(),
+  name text not null default 'Rolling Wrench Diesel LLC',
+  phone text,
+  email text,
+  website text,
+  address text,
+  settings jsonb default '{}'::jsonb,
+  created_at timestamptz default now()
+);
+
+create table if not exists public.profiles (
+  id uuid primary key default gen_random_uuid(),
+  auth_user_id uuid,
+  shop_id uuid references public.shops(id) on delete cascade,
+  name text,
+  email text,
+  role text default 'Owner/Admin',
+  created_at timestamptz default now()
+);
+
+create table if not exists public.rwd_app_data (
+  id uuid primary key default gen_random_uuid(),
+  shop_id uuid references public.shops(id) on delete cascade,
+  user_id uuid,
+  app_kind text,
+  local_id text,
+  payload jsonb,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+create table if not exists public.customer_links (
+  id uuid primary key default gen_random_uuid(),
+  shop_id uuid references public.shops(id) on delete cascade,
+  link_type text,
+  local_id text,
+  customer text,
+  status text default 'Ready',
+  payload jsonb default '{}'::jsonb,
+  created_at timestamptz default now(),
+  expires_at timestamptz
+);
+
+create table if not exists public.file_records (
+  id uuid primary key default gen_random_uuid(),
+  shop_id uuid references public.shops(id) on delete cascade,
+  local_id text,
+  file_name text,
+  file_path text,
+  public_url text,
+  purpose text,
+  payload jsonb default '{}'::jsonb,
+  created_at timestamptz default now()
+);
+
+alter table public.shops disable row level security;
+alter table public.profiles disable row level security;
+alter table public.rwd_app_data disable row level security;
+alter table public.customer_links disable row level security;
+alter table public.file_records disable row level security;`}</section>`;
+  bindPageTools();
+}
+
 const routes = {
   home:renderHome, clock:renderClock, truck:renderTruck, ai:renderAi, parts:renderParts, fault:renderFault,
   repairhud:renderRepairHud, quotes:renderQuotes, invoices:renderInvoices, workorders:renderWorkOrders,
   schedule:renderSchedule, customers:renderCustomers, pindrop:renderPinDrop, camera:renderCamera, reports:renderReports,
-  memory:renderMemory, suppliers:renderSuppliers, pmdue:renderPmDue, settings:renderSettingsSafe, alerts:renderAlerts, workflow:renderWorkflowHub, pmmanager:renderPMManager, inventory:renderInventory, supplierpricing:renderSupplierPricing, notifications:renderNotifications, signin:renderSignInPreview, supabase:renderSupabaseSync, v52:renderV52Dashboard, dashboard:renderBusinessDashboard, aioperator:renderAIOperator, photointel:renderPhotoIntelligence, schedulecommand:renderScheduleCommand, customerportal:renderCustomerPortalHub, sendquotes:renderQuoteSendCenter, sendinvoices:renderInvoiceSendCenter, stability:renderStabilityCenter, externallinks:renderExternalLinksCenter, storageprep:renderStoragePrep, portalhub:renderCustomerPortalHub, techmode:renderTechMode, about:renderAboutLegal, login:renderLogin, account:renderAuthSettings, aiengine:renderAiEngine, realocr:renderRealOCR, filestorage:renderFileStorage, gpsmanager:renderGPSManager, repair:renderRepair, business:renderBusiness
+  memory:renderMemory, suppliers:renderSuppliers, pmdue:renderPmDue, settings:renderSettingsSafe, alerts:renderAlerts, workflow:renderWorkflowHub, pmmanager:renderPMManager, inventory:renderInventory, supplierpricing:renderSupplierPricing, notifications:renderNotifications, signin:renderSignInPreview, supabase:renderSupabaseSync, v52:renderV52Dashboard, dashboard:renderBusinessDashboard, aioperator:renderAIOperator, photointel:renderPhotoIntelligence, schedulecommand:renderScheduleCommand, customerportal:renderCustomerPortalHub, sendquotes:renderQuoteSendCenter, sendinvoices:renderInvoiceSendCenter, stability:renderStabilityCenter, externallinks:renderExternalLinksCenter, storageprep:renderStoragePrep, backend:renderBackendCenter, backendsetup:renderBackendSetup, portalhub:renderCustomerPortalHub, techmode:renderTechMode, about:renderAboutLegal, login:renderLogin, account:renderAuthSettings, aiengine:renderAiEngine, realocr:renderRealOCR, filestorage:renderFileStorage, gpsmanager:renderGPSManager, repair:renderRepair, business:renderBusiness
 };
 function render(route=currentRoute()){
   try{

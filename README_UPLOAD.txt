@@ -138,3 +138,14 @@ V6.3 CUSTOMER QUOTE APPROVAL: Send Quotes center, approval links, customer appro
 V6.4 INVOICE PAYMENT + CUSTOMER PORTAL: Send Invoices center, invoice portal, sign invoice, paid/unpaid/partial status, payment method tracking, Square payment link placeholder, customer portal hub cleanup.
 
 V6.5: Stability Center, route/button test, External Links center, Storage Prep for signatures/photos/files, Supabase link sync prep.
+
+V6.6 REAL BACKEND CONNECTION:
+- Added SUPABASE_SETUP.sql.
+- Added Backend Center.
+- Tests Supabase tables: shops, profiles, rwd_app_data, customer_links, file_records.
+- Syncs core local data to rwd_app_data.
+- Syncs customer quote/invoice links to customer_links.
+- Prepares storage records for queued files/signatures.
+- Added AI endpoint/OCR endpoint settings.
+- Added SQL setup screen in app.
+Next: create Storage bucket rwd-files and connect actual file upload endpoint/policies.
