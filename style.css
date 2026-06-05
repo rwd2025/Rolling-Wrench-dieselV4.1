@@ -1153,3 +1153,101 @@ body.high-contrast{--line:#ffffff;--muted:#e9eef5}
 .vision-history-card b{display:block;color:#fff}
 .vision-history-card small{display:block;color:var(--muted);margin-top:4px}
 @media(max-width:520px){.vision-grid,.extracted-fields{grid-template-columns:1fr}.vision-history-card{grid-template-columns:auto 1fr}}
+
+
+/* ===== V6.9.1 PRODUCTION CLEANUP ===== */
+.cleanup-toolbar{
+  display:grid;
+  grid-template-columns:repeat(2,1fr);
+  gap:8px;
+  margin:10px 0;
+}
+.cleanup-toolbar button{
+  border:1px solid rgba(104,121,139,.45);
+  background:linear-gradient(145deg,#17222f,#0d131b);
+  color:#fff;
+  border-radius:13px;
+  padding:11px 8px;
+  font-weight:900;
+  text-transform:uppercase;
+}
+.cleanup-toolbar .danger{
+  border-color:#b63838;
+  background:linear-gradient(145deg,#3a1518,#12070a);
+}
+.memory-search{
+  border:1px solid rgba(255,122,24,.45);
+  background:linear-gradient(145deg,#17202b,#070b10);
+  border-radius:18px;
+  padding:12px;
+  margin-bottom:12px;
+}
+.memory-card{
+  border:1px solid rgba(104,121,139,.38);
+  background:#0a1017;
+  border-radius:16px;
+  padding:12px;
+  margin-bottom:9px;
+}
+.memory-card.test{
+  opacity:.65;
+  border-style:dashed;
+}
+.memory-card.archived{
+  opacity:.5;
+}
+.memory-card b{
+  display:block;
+  color:#fff;
+}
+.memory-card small{
+  display:block;
+  color:var(--muted);
+  margin-top:5px;
+  white-space:pre-wrap;
+}
+.memory-tags{
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px;
+  margin-top:8px;
+}
+.memory-tag{
+  border:1px solid rgba(104,121,139,.4);
+  background:#071018;
+  color:#dcecff;
+  border-radius:999px;
+  padding:5px 8px;
+  font-size:11px;
+  font-weight:800;
+}
+.row-actions{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:7px;
+  margin-top:10px;
+}
+.row-actions button{
+  border:1px solid rgba(104,121,139,.45);
+  background:linear-gradient(145deg,#17222f,#0d131b);
+  color:#fff;
+  border-radius:11px;
+  padding:9px 6px;
+  font-size:11px;
+  font-weight:900;
+  text-transform:uppercase;
+}
+.row-actions .danger{border-color:#b63838;color:#ffaaaa}
+.clean-log{
+  border:1px solid rgba(104,121,139,.38);
+  background:#050a0f;
+  color:#dce8f5;
+  border-radius:14px;
+  padding:10px;
+  white-space:pre-wrap;
+  max-height:220px;
+  overflow:auto;
+}
+@media(max-width:520px){
+  .cleanup-toolbar,.row-actions{grid-template-columns:1fr}
+}

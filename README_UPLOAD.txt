@@ -179,3 +179,13 @@ V6.9 OCR + VISION:
 - Original file can be saved to File Uploads workflow.
 - OCR/AI Vision endpoint settings.
 NOTE: Local extraction is placeholder/smart workflow. Real OCR/vision requires backend endpoint with AI/OCR service.
+
+V6.9.1 PRODUCTION CLEANUP:
+- Repair Memory Library.
+- Search/filter repair memory.
+- New/Edit/Delete/Archive/Mark Test repair memories.
+- Convert repair memory to Work Order or Invoice.
+- Data Cleanup center.
+- Delete test/demo records such as Jay/Bb/Test/Demo/Sample.
+- Cleanup log.
+- AI Summary helper for repair memory keywords/title.

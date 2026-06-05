@@ -132,6 +132,8 @@ function renderHome(){
       <button class="v5-hub-card" data-route="fileuploads"><b>File Uploads</b><small>Photos • docs • signatures</small></button>
       <button class="v5-hub-card" data-route="filehistory"><b>File History</b><small>Files by module</small></button>
       <button class="v5-hub-card" data-route="vision"><b>OCR + Vision</b><small>VIN • parts • invoices • faults</small></button>
+      <button class="v5-hub-card" data-route="memorylibrary"><b>Repair Memory Library</b><small>Search • edit • archive • AI</small></button>
+      <button class="v5-hub-card" data-route="cleanup"><b>Data Cleanup</b><small>Delete test records</small></button>
       <button class="v5-hub-card" data-route="visionsettings"><b>Vision Settings</b><small>OCR / AI endpoints</small></button>
       <button class="v5-hub-card" data-route="account"><b>Account / Roles</b><small>Login • users • permissions</small></button>
       <button class="v5-hub-card" data-route="dashboard"><b>Business Dashboard</b><small>Revenue • quotes • invoices • jobs</small></button>
@@ -2959,11 +2961,204 @@ function renderVisionSettings(){
   $("#saveVisionSettings2").onclick=()=>{state.backend=state.backend||{};state.backend.ocrEndpoint=$("#visionOcrEndpoint").value;state.backend.ocrKey=$("#visionOcrKey").value;state.backend.aiEndpoint=$("#visionAiEndpoint").value;saveState();toast("Vision settings saved");};
 }
 
+
+function ensureV691(){
+  if(typeof ensureV69 === "function") ensureV69();
+  if(!state.repairMemory) state.repairMemory = [];
+  if(!state.cleanupLog) state.cleanupLog = [];
+  // migrate notes into repairMemory view without deleting old notes
+  (state.notes||[]).forEach((n,idx)=>{
+    if(!state.repairMemory.find(m=>m.source==="notes" && m.sourceIndex===idx)){
+      state.repairMemory.push({
+        id:"MEM-NOTE-"+idx,
+        source:"notes",
+        sourceIndex:idx,
+        title:n.type || "Repair Memory",
+        complaint:n.note || "",
+        cause:"",
+        correction:"",
+        customer:state.truck?.customer || "",
+        truck:state.truck?.unit || "",
+        vin:state.truck?.vin || "",
+        engine:state.truck?.engine || "",
+        parts:"",
+        labor:"",
+        keywords:(n.type||"") + " " + (n.note||""),
+        date:n.date || new Date().toLocaleString(),
+        status:"Saved",
+        test:false,
+        archived:false
+      });
+    }
+  });
+}
+function cleanupAddLog(msg){
+  state.cleanupLog = state.cleanupLog || [];
+  state.cleanupLog.unshift(`${new Date().toLocaleString()} — ${msg}`);
+  saveState();
+}
+function isTestText(v){
+  const s=(v||"").toLowerCase().trim();
+  return ["test","demo","sample","jay","bb","asdf","aaa","bbb","123"].some(x=>s===x || s.includes("test"));
+}
+function memorySummary(m){
+  return [m.complaint,m.cause,m.correction,m.parts,m.keywords].filter(Boolean).join(" ");
+}
+function memoryMatches(m,q){
+  if(!q) return true;
+  const s=JSON.stringify(m).toLowerCase();
+  return s.includes(q.toLowerCase());
+}
+function memoryTags(m){
+  const tags=[];
+  if(m.engine) tags.push(m.engine);
+  if(m.vin) tags.push(m.vin);
+  if(m.customer) tags.push(m.customer);
+  if(m.status) tags.push(m.status);
+  if(m.test) tags.push("TEST");
+  if(m.archived) tags.push("ARCHIVED");
+  const kw=(m.keywords||"").split(/[,\s]+/).filter(Boolean).slice(0,5);
+  tags.push(...kw);
+  return tags;
+}
+function createRepairMemoryFromWorkOrder(i){
+  const w=state.workorders[i];
+  if(!w) return null;
+  const m={
+    id:"MEM-"+Date.now(),
+    title:w.customer ? `WO ${w.customer}` : "Work Order Memory",
+    complaint:w.desc || "",
+    cause:"",
+    correction:"",
+    customer:w.customer || "",
+    truck:w.truck || "",
+    vin:state.truck?.vin || "",
+    engine:state.truck?.engine || "",
+    parts:"",
+    labor:w.clockSeconds ? (w.clockSeconds/3600).toFixed(2) : "",
+    keywords:`workorder ${w.status||""} ${w.desc||""}`,
+    date:new Date().toLocaleString(),
+    status:"Saved",
+    test:false,
+    archived:false,
+    source:"workorders",
+    sourceIndex:i
+  };
+  state.repairMemory.unshift(m);
+  cleanupAddLog("Converted work order to repair memory");
+  return m;
+}
+function deleteTestRecords(){
+  ensureV691();
+  let count=0;
+  const filterReal = (item)=>{
+    const text=JSON.stringify(item||{});
+    const test=isTestText(item?.customer)||isTestText(item?.desc)||isTestText(item?.work)||isTestText(item?.note)||isTestText(text);
+    if(test){count++; return false;}
+    return true;
+  };
+  state.workorders=(state.workorders||[]).filter(filterReal);
+  state.quotes=(state.quotes||[]).filter(filterReal);
+  state.invoices=(state.invoices||[]).filter(filterReal);
+  state.notes=(state.notes||[]).filter(filterReal);
+  state.repairMemory=(state.repairMemory||[]).filter(m=>!(m.test || isTestText(m.customer) || isTestText(m.complaint) || isTestText(m.correction)));
+  cleanupAddLog(`Deleted ${count} test/demo records`);
+  saveState();
+  return count;
+}
+function renderRepairMemoryLibrary(){
+  ensureV691();
+  const q=(state.memorySearch||"");
+  const filtered=(state.repairMemory||[]).filter(m=>memoryMatches(m,q) && (!m.archived || state.showArchivedMemory));
+  $("#screen").innerHTML=`${pageHead("Repair Memory Library","saveMemorySearch")}
+  <section class="memory-search form-grid">
+    <label>Search Repair Memory<input id="memorySearchInput" value="${q}" placeholder="SPN/FMI, engine, VIN, customer, part number, symptom..."></label>
+    <div class="cleanup-toolbar">
+      <button id="newMemory">New Memory</button>
+      <button id="toggleArchived">${state.showArchivedMemory?"Hide Archived":"Show Archived"}</button>
+      <button data-route="cleanup">Data Cleanup</button>
+      <button data-route="aioperator">Ask AI</button>
+    </div>
+  </section>
+  <section>
+    ${filtered.length ? filtered.map((m,i)=>{
+      const realIndex=state.repairMemory.indexOf(m);
+      return `<div class="memory-card ${m.test?'test':''} ${m.archived?'archived':''}">
+        <b>${m.title || "Repair Memory"}</b>
+        <small>${m.date || ""}\nCustomer: ${m.customer || "---"}\nTruck/VIN: ${m.truck || "---"} ${m.vin || ""}\nComplaint: ${m.complaint || "---"}\nCause: ${m.cause || "---"}\nCorrection: ${m.correction || "---"}\nParts: ${m.parts || "---"}\nLabor: ${m.labor || "---"}</small>
+        <div class="memory-tags">${memoryTags(m).map(t=>`<span class="memory-tag">${t}</span>`).join("")}</div>
+        <div class="row-actions">
+          <button data-edit-memory="${realIndex}">Edit</button>
+          <button data-memory-test="${realIndex}">${m.test?"Unmark Test":"Mark Test"}</button>
+          <button data-memory-archive="${realIndex}">${m.archived?"Unarchive":"Archive"}</button>
+          <button data-memory-wo="${realIndex}">To WO</button>
+          <button data-memory-invoice="${realIndex}">To Invoice</button>
+          <button class="danger" data-delete-memory="${realIndex}">Delete</button>
+        </div>
+      </div>`}).join("") : `<div class="output">No repair memories found.</div>`}
+  </section>`;
+  bindPageTools();
+  $("#saveMemorySearch").onclick=()=>{state.memorySearch=$("#memorySearchInput").value;saveState();renderRepairMemoryLibrary();};
+  $("#memorySearchInput").oninput=()=>{state.memorySearch=$("#memorySearchInput").value;saveState();};
+  $("#newMemory").onclick=()=>renderMemoryEditor(-1);
+  $("#toggleArchived").onclick=()=>{state.showArchivedMemory=!state.showArchivedMemory;saveState();renderRepairMemoryLibrary();};
+  $$("[data-edit-memory]").forEach(b=>b.onclick=()=>renderMemoryEditor(Number(b.dataset.editMemory)));
+  $$("[data-memory-test]").forEach(b=>b.onclick=()=>{const m=state.repairMemory[Number(b.dataset.memoryTest)];m.test=!m.test;cleanupAddLog(`${m.test?"Marked":"Unmarked"} test: ${m.title}`);renderRepairMemoryLibrary();});
+  $$("[data-memory-archive]").forEach(b=>b.onclick=()=>{const m=state.repairMemory[Number(b.dataset.memoryArchive)];m.archived=!m.archived;cleanupAddLog(`${m.archived?"Archived":"Unarchived"}: ${m.title}`);renderRepairMemoryLibrary();});
+  $$("[data-delete-memory]").forEach(b=>b.onclick=()=>{const i=Number(b.dataset.deleteMemory);const title=state.repairMemory[i]?.title;state.repairMemory.splice(i,1);cleanupAddLog("Deleted memory: "+title);saveState();renderRepairMemoryLibrary();});
+  $$("[data-memory-wo]").forEach(b=>b.onclick=()=>{const m=state.repairMemory[Number(b.dataset.memoryWo)];state.workorders.push({customer:m.customer,truck:m.truck,desc:memorySummary(m),status:"Open",date:new Date().toLocaleString()});saveState();toast("Work order created");});
+  $$("[data-memory-invoice]").forEach(b=>b.onclick=()=>{const m=state.repairMemory[Number(b.dataset.memoryInvoice)];state.invoices.push({customer:m.customer,truck:m.truck,work:memorySummary(m),total:0,date:new Date().toLocaleString()});saveState();toast("Invoice created");});
+}
+function renderMemoryEditor(index){
+  ensureV691();
+  const m=index>=0 ? state.repairMemory[index] : {id:"MEM-"+Date.now(),title:"",complaint:"",cause:"",correction:"",customer:state.truck?.customer||"",truck:state.truck?.unit||"",vin:state.truck?.vin||"",engine:state.truck?.engine||"",parts:"",labor:"",keywords:"",status:"Saved",test:false,archived:false,date:new Date().toLocaleString()};
+  $("#screen").innerHTML=`${pageHead(index>=0?"Edit Memory":"New Memory","saveMemory")}
+  <section class="form-panel form-grid">
+    <label>Title<input id="memTitle" value="${m.title||""}"></label>
+    <div class="two-col"><label>Customer<input id="memCustomer" value="${m.customer||""}"></label><label>Truck<input id="memTruck" value="${m.truck||""}"></label></div>
+    <div class="two-col"><label>VIN<input id="memVin" value="${m.vin||""}"></label><label>Engine<input id="memEngine" value="${m.engine||""}"></label></div>
+    <label>Complaint<textarea id="memComplaint">${m.complaint||""}</textarea></label>
+    <label>Cause<textarea id="memCause">${m.cause||""}</textarea></label>
+    <label>Correction<textarea id="memCorrection">${m.correction||""}</textarea></label>
+    <div class="two-col"><label>Parts Used<input id="memParts" value="${m.parts||""}"></label><label>Labor Hours<input id="memLabor" value="${m.labor||""}"></label></div>
+    <label>Keywords<input id="memKeywords" value="${m.keywords||""}" placeholder="SPN/FMI, part number, symptom, engine"></label>
+    <div class="cleanup-toolbar"><button id="aiSummarizeMemory">AI Summary</button><button id="markMemoryTest">${m.test?"Unmark Test":"Mark Test"}</button></div>
+  </section>`;
+  bindPageTools();
+  $("#aiSummarizeMemory").onclick=()=>{const c=$("#memComplaint").value, cause=$("#memCause").value, corr=$("#memCorrection").value;$("#memTitle").value=$("#memTitle").value || (c?c.slice(0,42):"Repair Memory");$("#memKeywords").value=[c,cause,corr,$("#memEngine").value,$("#memParts").value].join(" ").split(/\s+/).filter(w=>w.length>3).slice(0,12).join(", ");toast("Summary fields generated");};
+  $("#markMemoryTest").onclick=()=>{m.test=!m.test;toast(m.test?"Marked test":"Unmarked test");};
+  $("#saveMemory").onclick=()=>{
+    Object.assign(m,{title:$("#memTitle").value||"Repair Memory",customer:$("#memCustomer").value,truck:$("#memTruck").value,vin:$("#memVin").value,engine:$("#memEngine").value,complaint:$("#memComplaint").value,cause:$("#memCause").value,correction:$("#memCorrection").value,parts:$("#memParts").value,labor:$("#memLabor").value,keywords:$("#memKeywords").value,status:"Saved",date:m.date||new Date().toLocaleString()});
+    if(index>=0) state.repairMemory[index]=m; else state.repairMemory.unshift(m);
+    cleanupAddLog("Saved repair memory: "+m.title);
+    saveState(); toast("Repair memory saved"); renderRepairMemoryLibrary();
+  };
+}
+function renderCleanupCenter(){
+  ensureV691();
+  $("#screen").innerHTML=`${pageHead("Data Cleanup","",false)}
+  <section class="backend-banner"><b>Production Cleanup</b><small>Edit, archive, delete, mark test records, and remove demo/test data.</small></section>
+  <section class="settings-section">
+    <h3>Cleanup Tools</h3>
+    <div class="cleanup-toolbar">
+      <button class="danger" id="deleteTestRecords">Delete Test Records</button>
+      <button data-route="memorylibrary">Repair Memory Library</button>
+      <button id="archiveTestWO">Mark Test Work Orders</button>
+      <button id="clearCleanupLog">Clear Log</button>
+    </div>
+    <div class="clean-log">${(state.cleanupLog||[]).join("\n") || "No cleanup actions yet."}</div>
+  </section>`;
+  bindPageTools();
+  $("#deleteTestRecords").onclick=()=>{const c=deleteTestRecords();toast(`Deleted ${c} test records`);renderCleanupCenter();};
+  $("#archiveTestWO").onclick=()=>{let c=0;(state.workorders||[]).forEach(w=>{if(isTestText(w.customer)||isTestText(w.desc)){w.test=true;c++;}});cleanupAddLog(`Marked ${c} work orders as test`);saveState();toast("Marked test WOs");renderCleanupCenter();};
+  $("#clearCleanupLog").onclick=()=>{state.cleanupLog=[];saveState();renderCleanupCenter();};
+}
+
 const routes = {
   home:renderHome, clock:renderClock, truck:renderTruck, ai:renderAi, parts:renderParts, fault:renderFault,
   repairhud:renderRepairHud, quotes:renderQuotes, invoices:renderInvoices, workorders:renderWorkOrders,
   schedule:renderSchedule, customers:renderCustomers, pindrop:renderPinDrop, camera:renderCamera, reports:renderReports,
-  memory:renderMemory, suppliers:renderSuppliers, pmdue:renderPmDue, settings:renderSettingsSafe, alerts:renderAlerts, workflow:renderWorkflowHub, pmmanager:renderPMManager, inventory:renderInventory, supplierpricing:renderSupplierPricing, notifications:renderNotifications, signin:renderSignInPreview, supabase:renderSupabaseSync, v52:renderV52Dashboard, dashboard:renderBusinessDashboard, aioperator:renderAIOperator, photointel:renderPhotoIntelligence, schedulecommand:renderScheduleCommand, customerportal:renderCustomerPortalHub, sendquotes:renderQuoteSendCenter, sendinvoices:renderInvoiceSendCenter, stability:renderStabilityCenter, externallinks:renderExternalLinksCenter, storageprep:renderStoragePrep, backend:renderBackendCenter, backendsetup:renderBackendSetup, communications:renderCommunicationCenter, templates:renderCommunicationTemplates, fileuploads:renderFileUploadCenter, filehistory:renderFileHistory, vision:renderVisionCenter, visionsettings:renderVisionSettings, portalhub:renderCustomerPortalHub, techmode:renderTechMode, about:renderAboutLegal, login:renderLogin, account:renderAuthSettings, aiengine:renderAiEngine, realocr:renderRealOCR, filestorage:renderFileStorage, gpsmanager:renderGPSManager, repair:renderRepair, business:renderBusiness
+  memory:renderRepairMemoryLibrary, suppliers:renderSuppliers, pmdue:renderPmDue, settings:renderSettingsSafe, alerts:renderAlerts, workflow:renderWorkflowHub, pmmanager:renderPMManager, inventory:renderInventory, supplierpricing:renderSupplierPricing, notifications:renderNotifications, signin:renderSignInPreview, supabase:renderSupabaseSync, v52:renderV52Dashboard, dashboard:renderBusinessDashboard, aioperator:renderAIOperator, photointel:renderPhotoIntelligence, schedulecommand:renderScheduleCommand, customerportal:renderCustomerPortalHub, sendquotes:renderQuoteSendCenter, sendinvoices:renderInvoiceSendCenter, stability:renderStabilityCenter, externallinks:renderExternalLinksCenter, storageprep:renderStoragePrep, backend:renderBackendCenter, backendsetup:renderBackendSetup, communications:renderCommunicationCenter, templates:renderCommunicationTemplates, fileuploads:renderFileUploadCenter, filehistory:renderFileHistory, vision:renderVisionCenter, memorylibrary:renderRepairMemoryLibrary, cleanup:renderCleanupCenter, visionsettings:renderVisionSettings, portalhub:renderCustomerPortalHub, techmode:renderTechMode, about:renderAboutLegal, login:renderLogin, account:renderAuthSettings, aiengine:renderAiEngine, realocr:renderRealOCR, filestorage:renderFileStorage, gpsmanager:renderGPSManager, repair:renderRepair, business:renderBusiness
 };
 function render(route=currentRoute()){
   try{
