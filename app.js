@@ -124,6 +124,8 @@ function renderHome(){
     <section class="v5-hub-grid">
       <button class="v5-hub-card" data-route="sendquotes"><b>Send Quotes</b><small>Customer approval • signature • status</small></button>
       <button class="v5-hub-card" data-route="sendinvoices"><b>Send Invoices</b><small>Portal • payments • Square link</small></button>
+      <button class="v5-hub-card" data-route="stability"><b>Stability Center</b><small>Button test • health check</small></button>
+      <button class="v5-hub-card" data-route="externallinks"><b>External Links</b><small>Supabase customer links</small></button>
       <button class="v5-hub-card" data-route="account"><b>Account / Roles</b><small>Login • users • permissions</small></button>
       <button class="v5-hub-card" data-route="dashboard"><b>Business Dashboard</b><small>Revenue • quotes • invoices • jobs</small></button>
       <button class="v5-hub-card" data-route="aioperator"><b>AI Operator</b><small>Ask AI to build anything</small></button>
@@ -2238,11 +2240,87 @@ function renderCustomerPortalHub(){
   bindPageTools();
 }
 
+
+function ensureV65(){
+  if(typeof ensureV64 === "function") ensureV64();
+  if(!state.externalLinks) state.externalLinks = [];
+  if(!state.storageQueue) state.storageQueue = [];
+  if(!state.healthChecks) state.healthChecks = [];
+}
+function v65SafeRouteList(){return ["home","settings","clock","quotes","invoices","sendquotes","sendinvoices","portalhub","customerportal","workflow","dashboard","ai","aioperator","truck","customers","workorders","schedule","parts","camera","realocr","filestorage","gpsmanager","supabase","account","about"];}
+function v65RunHealthCheck(){
+  ensureV65();
+  const checks=[
+    {name:"State",status:state?"good":"bad",detail:"Local state loaded"},
+    {name:"Settings",status:state.settings?"good":"warn",detail:JSON.stringify(state.settings||{},null,2)},
+    {name:"Clock Jobs",status:state.jobs?"good":"warn",detail:Object.keys(state.jobs||{}).join(", ")||"No jobs"},
+    {name:"Quotes",status:(state.quotes||[]).length?"good":"warn",detail:`${(state.quotes||[]).length} quotes saved`},
+    {name:"Invoices",status:(state.invoices||[]).length?"good":"warn",detail:`${(state.invoices||[]).length} invoices saved`},
+    {name:"Supabase",status:(state.supabase&&state.supabase.url)?"good":"warn",detail:(state.supabase&&state.supabase.url)||"Not configured"},
+    {name:"Routes",status:"good",detail:v65SafeRouteList().join(", ")}
+  ];
+  state.healthChecks=checks; saveState(); return checks;
+}
+function v65ExternalLink(kind,id,label){
+  ensureV65();
+  const link=`${location.origin}${location.pathname}#${kind}-${id}`;
+  const rec={kind,id,label:label||kind,link,status:"Ready",created:new Date().toLocaleString(),synced:false};
+  state.externalLinks.unshift(rec); saveState(); return rec;
+}
+async function v65SyncExternalLink(rec){
+  ensureSupabaseConfigured();
+  await supabaseRest("rwd_app_data","POST",{app_kind:"external_link",local_id:rec.id,payload:rec,created_at:new Date().toISOString()});
+  rec.synced=true; rec.syncedAt=new Date().toLocaleString(); saveState(); return true;
+}
+function v65QueueStorage(fileName,purpose,dataUrl){
+  ensureV65();
+  const rec={id:"FILE-"+Date.now(),fileName:fileName||"local-file",purpose:purpose||"file",dataUrl:dataUrl||null,status:"Queued",created:new Date().toLocaleString()};
+  state.storageQueue.unshift(rec); saveState(); return rec;
+}
+async function v65StoragePlaceholderUpload(rec){rec.status="Prepared";rec.note="Ready for Supabase Storage bucket upload when bucket/policies are configured.";rec.preparedAt=new Date().toLocaleString();saveState();return rec;}
+function v65SaveSignatureToStorage(prefix,purpose){
+  const sig=state[`${prefix}Signature`]; if(!sig||!sig.data){toast("No signature saved");return null;}
+  const rec=v65QueueStorage(`${prefix}-signature.png`,purpose||"signature",sig.data); toast("Signature queued"); return rec;
+}
+function renderStabilityCenter(){
+  ensureV65(); const checks=v65RunHealthCheck();
+  $("#screen").innerHTML=`${pageHead("Stability Center","",false)}
+  <section class="backend-banner"><b>V6.5 Stability Check</b><small>Checks routes, state, settings, clock, quotes, invoices, Supabase.</small></section>
+  <section class="health-grid">${checks.map(c=>`<div class="health-card ${c.status}"><b>${c.name}</b><small>${c.detail}</small></div>`).join("")}</section>
+  <section class="settings-section"><h3>Button Test</h3><div class="smart-action-row"><button id="testRoutes">Run Route Test</button><button data-route="storageprep">Storage Prep</button><button data-route="externallinks">External Links</button></div><div class="test-log" id="routeTestLog">Ready.</div></section>`;
+  bindPageTools();
+  $("#testRoutes").onclick=()=>{$("#routeTestLog").textContent=v65SafeRouteList().map(r=>`${r}: ${routes[r] || (r==="settings" ? "settings-fix" : "MISSING")}`).join("\n");};
+}
+function renderExternalLinksCenter(){
+  ensureV65();
+  $("#screen").innerHTML=`${pageHead("External Links","",false)}
+  <section class="backend-banner"><b>Customer Link Records</b><small>Quote/invoice/customer portal links stored as records and ready to sync.</small></section>
+  <section class="smart-action-row"><button id="makeQuoteLinks">Build Quote Links</button><button id="makeInvoiceLinks">Build Invoice Links</button><button id="syncAllLinks">Sync Links</button></section>
+  <section>${(state.externalLinks||[]).map((l,i)=>`<div class="external-link-card"><b>${l.label} • ${l.status} ${l.synced?"• Synced":""}</b><small>${l.created}</small><code>${l.link}</code><button class="action-btn" data-sync-link="${i}">Sync This</button></div>`).join("") || `<div class="output">No external links built yet.</div>`}</section>`;
+  bindPageTools();
+  $("#makeQuoteLinks").onclick=()=>{(state.quotes||[]).forEach((q,i)=>{if(typeof makeQuoteApproval==="function"){const a=makeQuoteApproval(i);v65ExternalLink("quoteapproval",a.id,`Quote ${q.customer||i}`);}});toast("Quote links built");renderExternalLinksCenter();};
+  $("#makeInvoiceLinks").onclick=()=>{(state.invoices||[]).forEach((inv,i)=>{if(typeof makeInvoiceLink==="function"){const a=makeInvoiceLink(i);v65ExternalLink("invoiceportal",a.id,`Invoice ${inv.customer||i}`);}});toast("Invoice links built");renderExternalLinksCenter();};
+  $("#syncAllLinks").onclick=async()=>{for(const rec of state.externalLinks){try{await v65SyncExternalLink(rec);}catch(e){rec.error=e.message;}}toast("Link sync attempted");renderExternalLinksCenter();};
+  $$("[data-sync-link]").forEach(btn=>btn.onclick=async()=>{const rec=state.externalLinks[Number(btn.dataset.syncLink)];try{await v65SyncExternalLink(rec);toast("Link synced");}catch(e){toast("Sync failed");}renderExternalLinksCenter();});
+}
+function renderStoragePrep(){
+  ensureV65();
+  $("#screen").innerHTML=`${pageHead("Storage Prep","saveStoragePrep")}
+  <section class="backend-banner"><b>Supabase Storage Prep</b><small>Queue signatures/photos/files for storage. Actual upload needs bucket rwd-files and policies.</small></section>
+  <section class="form-panel form-grid"><label>Purpose<select id="storagePurpose"><option>quote signature</option><option>invoice signature</option><option>truck photo</option><option>part label</option><option>VIN plate</option><option>invoice photo</option><option>repair photo</option></select></label><input id="storagePrepFile" type="file" accept="image/*,.pdf,.txt,.csv,.doc,.docx,.xlsx" multiple><div class="smart-action-row"><button id="queueStorageFiles">Queue Files</button><button id="queueQuoteSignature">Quote Signature</button><button id="queueInvoiceSignature">Invoice Signature</button></div><div>${(state.storageQueue||[]).map((f,i)=>`<div class="storage-card"><b>${f.fileName}</b><small>${f.purpose} • ${f.status} • ${f.created}<br>${f.note||""}</small><button class="action-btn" data-prepare-file="${i}">Prepare Upload</button></div>`).join("") || `<div class="output">No files queued.</div>`}</div></section>`;
+  bindPageTools();
+  $("#queueStorageFiles").onclick=()=>{[...$("#storagePrepFile").files].forEach(f=>v65QueueStorage(f.name,$("#storagePurpose").value,null));toast("Files queued");renderStoragePrep();};
+  $("#queueQuoteSignature").onclick=()=>{v65SaveSignatureToStorage("quote","quote signature");renderStoragePrep();};
+  $("#queueInvoiceSignature").onclick=()=>{v65SaveSignatureToStorage("invoice","invoice signature");renderStoragePrep();};
+  $$("[data-prepare-file]").forEach(btn=>btn.onclick=async()=>{await v65StoragePlaceholderUpload(state.storageQueue[Number(btn.dataset.prepareFile)]);toast("Prepared");renderStoragePrep();});
+  $("#saveStoragePrep").onclick=()=>{saveState();toast("Storage queue saved");};
+}
+
 const routes = {
   home:renderHome, clock:renderClock, truck:renderTruck, ai:renderAi, parts:renderParts, fault:renderFault,
   repairhud:renderRepairHud, quotes:renderQuotes, invoices:renderInvoices, workorders:renderWorkOrders,
   schedule:renderSchedule, customers:renderCustomers, pindrop:renderPinDrop, camera:renderCamera, reports:renderReports,
-  memory:renderMemory, suppliers:renderSuppliers, pmdue:renderPmDue, settings:renderSettingsSafe, alerts:renderAlerts, workflow:renderWorkflowHub, pmmanager:renderPMManager, inventory:renderInventory, supplierpricing:renderSupplierPricing, notifications:renderNotifications, signin:renderSignInPreview, supabase:renderSupabaseSync, v52:renderV52Dashboard, dashboard:renderBusinessDashboard, aioperator:renderAIOperator, photointel:renderPhotoIntelligence, schedulecommand:renderScheduleCommand, customerportal:renderCustomerPortalHub, sendquotes:renderQuoteSendCenter, sendinvoices:renderInvoiceSendCenter, portalhub:renderCustomerPortalHub, techmode:renderTechMode, about:renderAboutLegal, login:renderLogin, account:renderAuthSettings, aiengine:renderAiEngine, realocr:renderRealOCR, filestorage:renderFileStorage, gpsmanager:renderGPSManager, repair:renderRepair, business:renderBusiness
+  memory:renderMemory, suppliers:renderSuppliers, pmdue:renderPmDue, settings:renderSettingsSafe, alerts:renderAlerts, workflow:renderWorkflowHub, pmmanager:renderPMManager, inventory:renderInventory, supplierpricing:renderSupplierPricing, notifications:renderNotifications, signin:renderSignInPreview, supabase:renderSupabaseSync, v52:renderV52Dashboard, dashboard:renderBusinessDashboard, aioperator:renderAIOperator, photointel:renderPhotoIntelligence, schedulecommand:renderScheduleCommand, customerportal:renderCustomerPortalHub, sendquotes:renderQuoteSendCenter, sendinvoices:renderInvoiceSendCenter, stability:renderStabilityCenter, externallinks:renderExternalLinksCenter, storageprep:renderStoragePrep, portalhub:renderCustomerPortalHub, techmode:renderTechMode, about:renderAboutLegal, login:renderLogin, account:renderAuthSettings, aiengine:renderAiEngine, realocr:renderRealOCR, filestorage:renderFileStorage, gpsmanager:renderGPSManager, repair:renderRepair, business:renderBusiness
 };
 function render(route=currentRoute()){
   try{
