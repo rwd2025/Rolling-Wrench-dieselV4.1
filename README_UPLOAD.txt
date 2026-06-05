@@ -201,3 +201,13 @@ V7.0 ROLLING WRENCH AI BRAIN:
 - Brain settings screen.
 - Auto-route / use-backend toggles.
 NOTE: Real diagnostic intelligence and image understanding require live AI backend endpoint.
+
+V7.1 REAL AI BRAIN UPGRADE:
+- Replaced AI Brain with cleaner full-screen ChatGPT-style interface.
+- Fixed raw \n display by rendering real line breaks.
+- Stronger quote drafts with labor/service call/disclaimer.
+- Stronger invoice drafts with professional wording.
+- Stronger diagnostic workflow drafts.
+- Warns when no active truck/customer is loaded.
+- Simplified action buttons.
+- Still supports backend AI endpoint if configured.
