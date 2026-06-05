@@ -158,3 +158,14 @@ V6.7 CUSTOMER COMMUNICATION CENTER:
 - Message templates screen.
 - Send Quote/Send Invoice centers now include Text buttons.
 Next: Twilio/SMS API integration for automatic sent/opened delivery tracking.
+
+V6.8 REAL FILE UPLOADS:
+- File Uploads center.
+- Camera/file picker for images, PDFs, docs, spreadsheets.
+- Attach files/photos to Truck, Work Order, Quote, Invoice, Parts, Repair Memory.
+- Image preview.
+- Local file history.
+- Storage queue integration.
+- Supabase file_records sync prep.
+- File History screen grouped by module.
+NOTE: Browser local files are recorded/previewed. True cloud uploads require Supabase Storage bucket policies or an upload backend.

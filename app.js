@@ -129,6 +129,8 @@ function renderHome(){
       <button class="v5-hub-card" data-route="backend"><b>Backend Center</b><small>Tables • storage • AI • OCR</small></button>
       <button class="v5-hub-card" data-route="communications"><b>Customer Messages</b><small>Text quote • invoice • GPS • payment</small></button>
       <button class="v5-hub-card" data-route="templates"><b>Message Templates</b><small>Default text messages</small></button>
+      <button class="v5-hub-card" data-route="fileuploads"><b>File Uploads</b><small>Photos • docs • signatures</small></button>
+      <button class="v5-hub-card" data-route="filehistory"><b>File History</b><small>Files by module</small></button>
       <button class="v5-hub-card" data-route="account"><b>Account / Roles</b><small>Login • users • permissions</small></button>
       <button class="v5-hub-card" data-route="dashboard"><b>Business Dashboard</b><small>Revenue • quotes • invoices • jobs</small></button>
       <button class="v5-hub-card" data-route="aioperator"><b>AI Operator</b><small>Ask AI to build anything</small></button>
@@ -2661,11 +2663,173 @@ function renderCommunicationTemplates(){
   $("#saveTemplates").onclick=()=>{state.messageTemplates={quote:$("#tplQuote").value,invoice:$("#tplInvoice").value,payment:$("#tplPayment").value,gps:$("#tplGps").value,reminder:$("#tplReminder").value};saveState();toast("Templates saved");};
 }
 
+
+function ensureV68(){
+  if(typeof ensureV67 === "function") ensureV67();
+  if(!state.fileRecords) state.fileRecords = [];
+  if(!state.fileLinks) state.fileLinks = {};
+}
+function filePurposeIcon(purpose){
+  const p=(purpose||"").toLowerCase();
+  if(p.includes("vin")) return "VIN";
+  if(p.includes("part")) return "📦";
+  if(p.includes("invoice")) return "🧾";
+  if(p.includes("quote")) return "Q";
+  if(p.includes("truck")) return "🚚";
+  if(p.includes("repair")) return "🔧";
+  if(p.includes("signature")) return "✍";
+  return "📎";
+}
+function v68MakeFileRecord(file, target, purpose, notes, dataUrl){
+  ensureV68();
+  const rec={
+    id:"FILE-"+Date.now()+"-"+Math.floor(Math.random()*9999),
+    fileName:file?.name || "camera-capture",
+    size:file?.size || 0,
+    mime:file?.type || "",
+    target:target || "repair memory",
+    purpose:purpose || "file",
+    notes:notes || "",
+    dataUrl:dataUrl || "",
+    status:"Local Saved",
+    created:new Date().toLocaleString(),
+    customer:state.truck.customer || "",
+    truck:state.truck.unit || "",
+    vin:state.truck.vin || ""
+  };
+  state.fileRecords.unshift(rec);
+  if(!state.fileLinks[rec.target]) state.fileLinks[rec.target]=[];
+  state.fileLinks[rec.target].unshift(rec.id);
+  state.storageQueue = state.storageQueue || [];
+  state.storageQueue.unshift({id:rec.id,fileName:rec.fileName,purpose:rec.purpose,status:"Queued",created:rec.created,target:rec.target,record:rec});
+  saveState();
+  return rec;
+}
+function v68AttachFileToModule(rec){
+  const text=`File attached: ${rec.fileName} • ${rec.purpose} • ${rec.notes}`;
+  if(rec.target==="truck"){ addTruckHistory("File", text); }
+  if(rec.target==="parts"){ state.parts.push({query:rec.fileName,notes:text}); }
+  if(rec.target==="invoice"){ state.invoices.push({customer:rec.customer,truck:rec.truck,work:text,total:0,fileId:rec.id,date:new Date().toLocaleString()}); }
+  if(rec.target==="quote"){ state.quotes.push({customer:rec.customer,truck:rec.truck,desc:text,total:0,fileId:rec.id,date:new Date().toLocaleString()}); }
+  if(rec.target==="workorder"){ state.workorders.push({customer:rec.customer,truck:rec.truck,desc:text,status:"File Attached",fileId:rec.id,date:new Date().toLocaleString()}); }
+  if(rec.target==="memory"){ state.notes.push({type:"File",note:text,fileId:rec.id,date:new Date().toLocaleString()}); }
+  saveState();
+}
+async function v68SyncFileRecords(){
+  ensureV68();
+  const log=[];
+  for(const rec of state.fileRecords){
+    try{
+      if(typeof v66Insert === "function"){
+        await v66Insert("file_records",{
+          shop_id:state.backend?.shopId || null,
+          local_id:rec.id,
+          file_name:rec.fileName,
+          file_path:`${state.backend?.bucket || "rwd-files"}/${rec.id}-${rec.fileName}`,
+          public_url:"",
+          purpose:rec.purpose,
+          payload:rec
+        });
+        rec.status="Record Synced";
+        rec.syncedAt=new Date().toLocaleString();
+        log.push(`${rec.fileName}: synced`);
+      }else{
+        log.push(`${rec.fileName}: backend insert not available`);
+      }
+    }catch(e){
+      rec.error=e.message;
+      log.push(`${rec.fileName}: ${e.message}`);
+    }
+  }
+  saveState();
+  return log.join("\n");
+}
+function v68ReadFileAsDataUrl(file){
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=()=>resolve(reader.result);
+    reader.onerror=()=>reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+function renderFileUploadCenter(){
+  ensureV68();
+  $("#screen").innerHTML=`${pageHead("File Uploads","saveFileUpload")}
+  <section class="file-upload-hero"><b>Real File Upload Workflow</b><small>Attach photos, VIN plates, part labels, invoices, receipts, signatures, and repair photos to the correct customer/truck/job.</small></section>
+  <section class="form-panel form-grid">
+    <label>Attach To<select id="fileTarget"><option value="truck">Truck History</option><option value="workorder">Work Order</option><option value="quote">Quote</option><option value="invoice">Invoice</option><option value="parts">Parts Lookup</option><option value="memory">Repair Memory</option></select></label>
+    <label>Purpose<select id="filePurpose"><option>truck photo</option><option>VIN plate</option><option>part label</option><option>invoice / receipt</option><option>before repair photo</option><option>after repair photo</option><option>damage photo</option><option>signature</option><option>document</option></select></label>
+    <input id="fileUploadInput" type="file" accept="image/*,.pdf,.txt,.csv,.doc,.docx,.xlsx" multiple>
+    <label>Notes<textarea id="fileNotes" placeholder="What is this file/photo?"></textarea></label>
+    <div class="smart-action-row">
+      <button id="saveUploadFiles">Save Files</button>
+      <button id="cameraUpload">Camera</button>
+      <button id="syncFileRecords">Sync Records</button>
+    </div>
+    <input id="cameraUploadInput" type="file" accept="image/*" capture="environment" hidden>
+    <div class="file-preview-box" id="filePreview">No file selected.</div>
+    <div class="upload-status" id="fileUploadStatus">Ready.</div>
+  </section>
+  <section class="settings-section">
+    <h3>Saved Files</h3>
+    ${(state.fileRecords||[]).length ? state.fileRecords.map(r=>`<div class="file-record"><div class="file-icon">${filePurposeIcon(r.purpose)}</div><div><b>${r.fileName}</b><small>${r.target} • ${r.purpose} • ${r.status}<br>${r.notes||""}</small></div><button class="action-btn" data-open-file="${r.id}">Open</button></div>`).join("") : `<div class="output">No files saved yet.</div>`}
+  </section>`;
+  bindPageTools();
+  const previewFile=async(file)=>{
+    if(!file){$("#filePreview").textContent="No file selected.";return;}
+    let text=`Selected: ${file.name}\nType: ${file.type || "unknown"}\nSize: ${file.size} bytes`;
+    if(file.type && file.type.startsWith("image/")){
+      const url=await v68ReadFileAsDataUrl(file);
+      text += `\nImage preview below.`;
+      $("#filePreview").innerHTML=text+`<img src="${url}" alt="preview">`;
+    }else{
+      $("#filePreview").textContent=text;
+    }
+  };
+  $("#fileUploadInput").onchange=()=>previewFile($("#fileUploadInput").files[0]);
+  $("#cameraUpload").onclick=()=>$("#cameraUploadInput").click();
+  $("#cameraUploadInput").onchange=async()=>{const f=$("#cameraUploadInput").files[0];await previewFile(f);};
+  async function saveFilesFrom(input){
+    const files=[...input.files];
+    if(!files.length){toast("Choose files first");return;}
+    const log=[];
+    for(const f of files){
+      let dataUrl="";
+      if(f.type && f.type.startsWith("image/")) dataUrl=await v68ReadFileAsDataUrl(f);
+      const rec=v68MakeFileRecord(f,$("#fileTarget").value,$("#filePurpose").value,$("#fileNotes").value,dataUrl);
+      v68AttachFileToModule(rec);
+      log.push(`${rec.fileName}: saved to ${rec.target}`);
+    }
+    $("#fileUploadStatus").textContent=log.join("\n");
+    toast("Files saved");
+    renderFileUploadCenter();
+  }
+  $("#saveUploadFiles").onclick=()=>saveFilesFrom($("#fileUploadInput").files.length?$("#fileUploadInput"):$("#cameraUploadInput"));
+  $("#syncFileRecords").onclick=async()=>{$("#fileUploadStatus").textContent="Syncing file records...";$("#fileUploadStatus").textContent=await v68SyncFileRecords();toast("File records sync attempted");};
+  $$("[data-open-file]").forEach(btn=>btn.onclick=()=>{
+    const r=state.fileRecords.find(x=>x.id===btn.dataset.openFile);
+    if(!r) return;
+    $("#fileUploadStatus").textContent=JSON.stringify(r,null,2);
+    if(r.dataUrl) $("#filePreview").innerHTML=`${r.fileName}<img src="${r.dataUrl}" alt="file">`;
+  });
+  $("#saveFileUpload").onclick=()=>{saveState();toast("File uploads saved");};
+}
+function renderFileHistory(){
+  ensureV68();
+  const groups={};
+  (state.fileRecords||[]).forEach(r=>{const k=r.target||"other";groups[k]=groups[k]||[];groups[k].push(r);});
+  $("#screen").innerHTML=`${pageHead("File History","",false)}
+  <section class="settings-section"><h3>Files By Module</h3>
+  ${Object.keys(groups).length ? Object.entries(groups).map(([k,items])=>`<div class="storage-card"><b>${k}</b><small>${items.length} files</small>${items.map(r=>`<div class="file-record"><div class="file-icon">${filePurposeIcon(r.purpose)}</div><div><b>${r.fileName}</b><small>${r.purpose} • ${r.created}</small></div></div>`).join("")}</div>`).join("") : `<div class="output">No file history yet.</div>`}
+  </section>`;
+  bindPageTools();
+}
+
 const routes = {
   home:renderHome, clock:renderClock, truck:renderTruck, ai:renderAi, parts:renderParts, fault:renderFault,
   repairhud:renderRepairHud, quotes:renderQuotes, invoices:renderInvoices, workorders:renderWorkOrders,
   schedule:renderSchedule, customers:renderCustomers, pindrop:renderPinDrop, camera:renderCamera, reports:renderReports,
-  memory:renderMemory, suppliers:renderSuppliers, pmdue:renderPmDue, settings:renderSettingsSafe, alerts:renderAlerts, workflow:renderWorkflowHub, pmmanager:renderPMManager, inventory:renderInventory, supplierpricing:renderSupplierPricing, notifications:renderNotifications, signin:renderSignInPreview, supabase:renderSupabaseSync, v52:renderV52Dashboard, dashboard:renderBusinessDashboard, aioperator:renderAIOperator, photointel:renderPhotoIntelligence, schedulecommand:renderScheduleCommand, customerportal:renderCustomerPortalHub, sendquotes:renderQuoteSendCenter, sendinvoices:renderInvoiceSendCenter, stability:renderStabilityCenter, externallinks:renderExternalLinksCenter, storageprep:renderStoragePrep, backend:renderBackendCenter, backendsetup:renderBackendSetup, communications:renderCommunicationCenter, templates:renderCommunicationTemplates, portalhub:renderCustomerPortalHub, techmode:renderTechMode, about:renderAboutLegal, login:renderLogin, account:renderAuthSettings, aiengine:renderAiEngine, realocr:renderRealOCR, filestorage:renderFileStorage, gpsmanager:renderGPSManager, repair:renderRepair, business:renderBusiness
+  memory:renderMemory, suppliers:renderSuppliers, pmdue:renderPmDue, settings:renderSettingsSafe, alerts:renderAlerts, workflow:renderWorkflowHub, pmmanager:renderPMManager, inventory:renderInventory, supplierpricing:renderSupplierPricing, notifications:renderNotifications, signin:renderSignInPreview, supabase:renderSupabaseSync, v52:renderV52Dashboard, dashboard:renderBusinessDashboard, aioperator:renderAIOperator, photointel:renderPhotoIntelligence, schedulecommand:renderScheduleCommand, customerportal:renderCustomerPortalHub, sendquotes:renderQuoteSendCenter, sendinvoices:renderInvoiceSendCenter, stability:renderStabilityCenter, externallinks:renderExternalLinksCenter, storageprep:renderStoragePrep, backend:renderBackendCenter, backendsetup:renderBackendSetup, communications:renderCommunicationCenter, templates:renderCommunicationTemplates, fileuploads:renderFileUploadCenter, filehistory:renderFileHistory, portalhub:renderCustomerPortalHub, techmode:renderTechMode, about:renderAboutLegal, login:renderLogin, account:renderAuthSettings, aiengine:renderAiEngine, realocr:renderRealOCR, filestorage:renderFileStorage, gpsmanager:renderGPSManager, repair:renderRepair, business:renderBusiness
 };
 function render(route=currentRoute()){
   try{
