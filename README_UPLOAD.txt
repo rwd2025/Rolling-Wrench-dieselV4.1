@@ -189,3 +189,15 @@ V6.9.1 PRODUCTION CLEANUP:
 - Delete test/demo records such as Jay/Bb/Test/Demo/Sample.
 - Cleanup log.
 - AI Summary helper for repair memory keywords/title.
+
+V7.0 ROLLING WRENCH AI BRAIN:
+- New RW AI Brain command center.
+- One command box routes to quotes, invoices, work orders, repair memory, diagnostics, parts, OCR/vision, customer, truck, schedule, communications.
+- Quick command buttons.
+- AI context from active customer/truck/VIN/engine/rates.
+- Local smart workflow fallback.
+- Backend AI endpoint support through existing backend settings.
+- AI action log.
+- Brain settings screen.
+- Auto-route / use-backend toggles.
+NOTE: Real diagnostic intelligence and image understanding require live AI backend endpoint.

@@ -132,6 +132,8 @@ function renderHome(){
       <button class="v5-hub-card" data-route="fileuploads"><b>File Uploads</b><small>Photos • docs • signatures</small></button>
       <button class="v5-hub-card" data-route="filehistory"><b>File History</b><small>Files by module</small></button>
       <button class="v5-hub-card" data-route="vision"><b>OCR + Vision</b><small>VIN • parts • invoices • faults</small></button>
+      <button class="v5-hub-card" data-route="brain"><b>RW AI Brain</b><small>One command controls the app</small></button>
+      <button class="v5-hub-card" data-route="brainsettings"><b>Brain Settings</b><small>AI / OCR endpoints</small></button>
       <button class="v5-hub-card" data-route="memorylibrary"><b>Repair Memory Library</b><small>Search • edit • archive • AI</small></button>
       <button class="v5-hub-card" data-route="cleanup"><b>Data Cleanup</b><small>Delete test records</small></button>
       <button class="v5-hub-card" data-route="visionsettings"><b>Vision Settings</b><small>OCR / AI endpoints</small></button>
@@ -3154,11 +3156,230 @@ function renderCleanupCenter(){
   $("#clearCleanupLog").onclick=()=>{state.cleanupLog=[];saveState();renderCleanupCenter();};
 }
 
+
+function ensureV70(){
+  if(typeof ensureV691 === "function") ensureV691();
+  if(!state.brainChats) state.brainChats = [];
+  if(!state.brainActions) state.brainActions = [];
+  if(!state.brainSettings) state.brainSettings = {autoRoute:true,autoSave:true,readBack:false,useBackend:true};
+}
+function brainLog(action,detail){
+  state.brainActions.unshift({action,detail,date:new Date().toLocaleString()});
+  saveState();
+}
+function brainContext(){
+  return {
+    customer:state.truck?.customer || "",
+    truck:state.truck?.unit || "",
+    vin:state.truck?.vin || "",
+    engine:state.truck?.engine || "",
+    laborRate:state.settings?.laborRate || 135,
+    serviceCall:state.settings?.serviceCall || 250
+  };
+}
+function brainIntent(text){
+  const q=(text||"").toLowerCase();
+  if(q.includes("quote") || q.includes("estimate")) return "quote";
+  if(q.includes("invoice") || q.includes("bill")) return "invoice";
+  if(q.includes("work order") || q.includes("wo ") || q.includes("job")) return "workorder";
+  if(q.includes("repair memory") || q.includes("save this fix") || q.includes("seen this before")) return "memory";
+  if(q.includes("spn") || q.includes("fmi") || q.includes("fault") || q.includes("code")) return "diagnostic";
+  if(q.includes("part") || q.includes("supplier") || q.includes("price") || q.includes("water pump") || q.includes("clutch") || q.includes("belt")) return "parts";
+  if(q.includes("vin") || q.includes("scan") || q.includes("photo") || q.includes("ocr") || q.includes("picture")) return "vision";
+  if(q.includes("customer")) return "customer";
+  if(q.includes("truck")) return "truck";
+  if(q.includes("schedule") || q.includes("appointment")) return "schedule";
+  if(q.includes("text") || q.includes("send")) return "communication";
+  return "general";
+}
+function brainBuildProfessionalText(intent,text){
+  const ctx=brainContext();
+  if(intent==="quote"){
+    return `Quote draft created from AI command.
+
+Customer: ${ctx.customer || "Add customer"}
+Truck/VIN: ${ctx.truck || "Add truck"} ${ctx.vin || ""}
+Engine: ${ctx.engine || "Unknown"}
+Request: ${text}
+
+Labor Rate: ${money(ctx.laborRate)}/hr
+Service Call: ${money(ctx.serviceCall)}
+
+Disclaimer:
+${quoteLegalText ? quoteLegalText() : "Price may vary based on actual repair requirements."}`;
+  }
+  if(intent==="invoice"){
+    return `Professional invoice work performed:
+
+${text}
+
+Complaint/Cause/Correction:
+Customer concern was documented. Work was performed as described. Final checks completed as applicable.
+
+Payment due upon receipt unless otherwise agreed.`;
+  }
+  if(intent==="diagnostic"){
+    return `Diagnostic workflow for: ${text}
+
+1. Confirm active/inactive status.
+2. Record module, SPN/FMI, occurrence count.
+3. Check power, ground, datalink, connectors, and harness rub points.
+4. Compare live data to expected values.
+5. Test related sensors/actuators before replacing parts.
+6. Verify repair with road test or regen/test procedure.
+
+Save to Fault Doctor or Repair Memory when complete.`;
+  }
+  if(intent==="parts"){
+    return `Parts workflow for: ${text}
+
+Exact part number must be verified by VIN/OEM/supplier before quoting.
+Save to Parts Lookup and Supplier Pricing.
+Add location, price, availability, and alternate numbers.`;
+  }
+  if(intent==="memory"){
+    return `Repair Memory draft:
+
+Problem:
+${text}
+
+Cause:
+Add verified cause.
+
+Correction:
+Add final repair.
+
+Keywords:
+${text.split(/\s+/).filter(w=>w.length>3).slice(0,10).join(", ")}`;
+  }
+  return `Rolling Wrench AI received:
+
+${text}
+
+I can route this to quotes, invoices, work orders, parts, diagnostics, repair memory, schedule, customer messages, OCR/vision, or truck history.`;
+}
+async function brainBackendAnswer(text){
+  if(state.brainSettings.useBackend && state.backend?.aiEndpoint){
+    try{
+      return await v66AskRealAi(text);
+    }catch(e){
+      return brainBuildProfessionalText(brainIntent(text),text) + `\n\nBackend AI failed: ${e.message}`;
+    }
+  }
+  return brainBuildProfessionalText(brainIntent(text),text);
+}
+function brainRouteAction(intent,text,answer){
+  const ctx=brainContext();
+  let route="ai";
+  if(intent==="quote"){
+    state.quotes.unshift({customer:ctx.customer,truck:ctx.truck,desc:answer,total:0,status:"Draft",date:new Date().toLocaleString(),ai:true});
+    route="quotes"; brainLog("Quote Created",text);
+  }else if(intent==="invoice"){
+    state.invoices.unshift({customer:ctx.customer,truck:ctx.truck,work:answer,total:0,status:"Draft",date:new Date().toLocaleString(),ai:true});
+    route="invoices"; brainLog("Invoice Created",text);
+  }else if(intent==="workorder"){
+    state.workorders.unshift({customer:ctx.customer,truck:ctx.truck,desc:text,status:"Open",date:new Date().toLocaleString(),ai:true});
+    route="workorders"; brainLog("Work Order Created",text);
+  }else if(intent==="memory"){
+    ensureV691();
+    state.repairMemory.unshift({id:"MEM-AI-"+Date.now(),title:text.slice(0,50)||"AI Memory",complaint:text,cause:"",correction:"",customer:ctx.customer,truck:ctx.truck,vin:ctx.vin,engine:ctx.engine,keywords:text,status:"Saved",date:new Date().toLocaleString(),ai:true});
+    route="memorylibrary"; brainLog("Repair Memory Saved",text);
+  }else if(intent==="diagnostic"){
+    state.notes.unshift({type:"AI Diagnostic",note:answer,date:new Date().toLocaleString()});
+    route="fault"; brainLog("Diagnostic Saved",text);
+  }else if(intent==="parts"){
+    state.parts.unshift({query:text,notes:answer,date:new Date().toLocaleString(),ai:true});
+    route="parts"; brainLog("Parts Note Saved",text);
+  }else if(intent==="vision"){
+    route="vision"; brainLog("Vision Routed",text);
+  }else if(intent==="schedule"){
+    state.schedule.unshift({date:"",time:"",customer:ctx.customer,truck:ctx.truck,job:text,tech:"",ai:true});
+    route="schedule"; brainLog("Schedule Draft Created",text);
+  }else if(intent==="communication"){
+    route="communications"; brainLog("Communication Routed",text);
+  }else if(intent==="truck"){
+    addTruckHistory("AI Note",answer);
+    route="truck"; brainLog("Truck History Updated",text);
+  }else if(intent==="customer"){
+    route="customers"; brainLog("Customer Routed",text);
+  }else{
+    state.notes.unshift({type:"AI Brain",note:answer,date:new Date().toLocaleString()});
+    brainLog("AI Note Saved",text);
+  }
+  saveState();
+  return route;
+}
+function renderBrain(){
+  ensureV70();
+  const ctx=brainContext();
+  $("#screen").innerHTML=`${pageHead("RW AI Brain","saveBrainSettings")}
+  <section class="brain-hero"><b>Rolling Wrench AI Brain</b><small>One command box controls quotes, invoices, work orders, diagnostics, parts, OCR/vision, repair memory, customers, trucks, schedule, and messages.</small></section>
+  <section class="brain-context">
+    <div><b>Customer</b><span>${ctx.customer || "None"}</span></div>
+    <div><b>Truck / VIN</b><span>${ctx.truck || "None"} ${ctx.vin || ""}</span></div>
+    <div><b>Engine</b><span>${ctx.engine || "Unknown"}</span></div>
+    <div><b>Rates</b><span>${money(ctx.laborRate)}/hr • ${money(ctx.serviceCall)} call</span></div>
+  </section>
+  <section class="brain-command-grid">
+    <button class="brain-command" data-brain-prompt="Build quote for X15 water pump"><b>Build Quote</b><small>AI creates estimate</small></button>
+    <button class="brain-command" data-brain-prompt="Build invoice for replaced water pump and belt"><b>Build Invoice</b><small>Professional wording</small></button>
+    <button class="brain-command" data-brain-prompt="Diagnose SPN 3364 FMI 2"><b>Fault Doctor</b><small>SPN/FMI workflow</small></button>
+    <button class="brain-command" data-route="vision"><b>Scan Photo</b><small>VIN / parts / invoice / fault</small></button>
+  </section>
+  <section class="brain-chat" id="brainChat">
+    ${(state.brainChats||[]).map(m=>`<div class="brain-msg ${m.role}"><b>${m.role==="user"?"You":"RW AI"}</b>${m.text}</div>`).join("") || `<div class="brain-msg ai"><b>RW AI</b>Ask me to build a quote, invoice, work order, diagnose a fault, search repair memory, read a VIN/part label, or message a customer.</div>`}
+  </section>
+  <section class="brain-input-row">
+    <button id="brainMic">🎙</button>
+    <input id="brainInput" placeholder="Ask Rolling Wrench AI anything..." />
+    <button id="brainAttach">+</button>
+    <button class="send" id="brainSend">Send</button>
+  </section>
+  <section class="settings-section">
+    <h3>Action Log</h3>
+    <div class="brain-action-log">${(state.brainActions||[]).map(a=>`${a.date} — ${a.action}: ${a.detail}`).join("\n") || "No AI actions yet."}</div>
+  </section>`;
+  bindPageTools();
+  async function runBrain(text){
+    if(!text) return;
+    state.brainChats.push({role:"user",text,date:new Date().toLocaleString()});
+    $("#brainChat").innerHTML += `<div class="brain-msg user"><b>You</b>${text}</div>`;
+    const intent=brainIntent(text);
+    const answer=await brainBackendAnswer(text);
+    state.brainChats.push({role:"ai",text:answer,date:new Date().toLocaleString(),intent});
+    const route=state.brainSettings.autoRoute ? brainRouteAction(intent,text,answer) : "brain";
+    saveState();
+    renderBrain();
+    toast(`AI routed: ${intent}`);
+  }
+  $("#brainSend").onclick=()=>runBrain($("#brainInput").value);
+  $("#brainInput").onkeydown=e=>{if(e.key==="Enter") runBrain($("#brainInput").value);};
+  $("#brainMic").onclick=()=>{if(typeof startVoiceToField==="function") startVoiceToField("brainInput"); else toast("Voice not available");};
+  $("#brainAttach").onclick=()=>setRoute("vision");
+  $$("[data-brain-prompt]").forEach(b=>b.onclick=()=>runBrain(b.dataset.brainPrompt));
+  $("#saveBrainSettings").onclick=()=>{saveState();toast("AI Brain saved");};
+}
+function renderBrainSettings(){
+  ensureV70();
+  $("#screen").innerHTML=`${pageHead("AI Brain Settings","saveBrainSettings2")}
+  <section class="form-panel form-grid">
+    <label>AI Endpoint<input id="brainAiEndpoint" value="${state.backend?.aiEndpoint||""}" placeholder="https://your-ai-backend"></label>
+    <label>AI Key<input id="brainAiKey" value="${state.backend?.aiKey||""}"></label>
+    <label>OCR/Vision Endpoint<input id="brainOcrEndpoint" value="${state.backend?.ocrEndpoint||""}"></label>
+    <label>OCR Key<input id="brainOcrKey" value="${state.backend?.ocrKey||""}"></label>
+    <label>Auto Route<select id="brainAutoRoute"><option ${state.brainSettings.autoRoute?"selected":""}>On</option><option ${!state.brainSettings.autoRoute?"selected":""}>Off</option></select></label>
+    <label>Use Backend<select id="brainUseBackend"><option ${state.brainSettings.useBackend?"selected":""}>On</option><option ${!state.brainSettings.useBackend?"selected":""}>Off</option></select></label>
+    <div class="output">When backend is empty, RW AI Brain uses local smart workflow. When backend endpoint is added, commands go to real AI service.</div>
+  </section>`;
+  bindPageTools();
+  $("#saveBrainSettings2").onclick=()=>{state.backend=state.backend||{};state.backend.aiEndpoint=$("#brainAiEndpoint").value;state.backend.aiKey=$("#brainAiKey").value;state.backend.ocrEndpoint=$("#brainOcrEndpoint").value;state.backend.ocrKey=$("#brainOcrKey").value;state.brainSettings.autoRoute=$("#brainAutoRoute").value==="On";state.brainSettings.useBackend=$("#brainUseBackend").value==="On";saveState();toast("Brain settings saved");};
+}
+
 const routes = {
   home:renderHome, clock:renderClock, truck:renderTruck, ai:renderAi, parts:renderParts, fault:renderFault,
   repairhud:renderRepairHud, quotes:renderQuotes, invoices:renderInvoices, workorders:renderWorkOrders,
   schedule:renderSchedule, customers:renderCustomers, pindrop:renderPinDrop, camera:renderCamera, reports:renderReports,
-  memory:renderRepairMemoryLibrary, suppliers:renderSuppliers, pmdue:renderPmDue, settings:renderSettingsSafe, alerts:renderAlerts, workflow:renderWorkflowHub, pmmanager:renderPMManager, inventory:renderInventory, supplierpricing:renderSupplierPricing, notifications:renderNotifications, signin:renderSignInPreview, supabase:renderSupabaseSync, v52:renderV52Dashboard, dashboard:renderBusinessDashboard, aioperator:renderAIOperator, photointel:renderPhotoIntelligence, schedulecommand:renderScheduleCommand, customerportal:renderCustomerPortalHub, sendquotes:renderQuoteSendCenter, sendinvoices:renderInvoiceSendCenter, stability:renderStabilityCenter, externallinks:renderExternalLinksCenter, storageprep:renderStoragePrep, backend:renderBackendCenter, backendsetup:renderBackendSetup, communications:renderCommunicationCenter, templates:renderCommunicationTemplates, fileuploads:renderFileUploadCenter, filehistory:renderFileHistory, vision:renderVisionCenter, memorylibrary:renderRepairMemoryLibrary, cleanup:renderCleanupCenter, visionsettings:renderVisionSettings, portalhub:renderCustomerPortalHub, techmode:renderTechMode, about:renderAboutLegal, login:renderLogin, account:renderAuthSettings, aiengine:renderAiEngine, realocr:renderRealOCR, filestorage:renderFileStorage, gpsmanager:renderGPSManager, repair:renderRepair, business:renderBusiness
+  memory:renderRepairMemoryLibrary, suppliers:renderSuppliers, pmdue:renderPmDue, settings:renderSettingsSafe, alerts:renderAlerts, workflow:renderWorkflowHub, pmmanager:renderPMManager, inventory:renderInventory, supplierpricing:renderSupplierPricing, notifications:renderNotifications, signin:renderSignInPreview, supabase:renderSupabaseSync, v52:renderV52Dashboard, dashboard:renderBusinessDashboard, aioperator:renderAIOperator, photointel:renderPhotoIntelligence, schedulecommand:renderScheduleCommand, customerportal:renderCustomerPortalHub, sendquotes:renderQuoteSendCenter, sendinvoices:renderInvoiceSendCenter, stability:renderStabilityCenter, externallinks:renderExternalLinksCenter, storageprep:renderStoragePrep, backend:renderBackendCenter, backendsetup:renderBackendSetup, communications:renderCommunicationCenter, templates:renderCommunicationTemplates, fileuploads:renderFileUploadCenter, filehistory:renderFileHistory, vision:renderVisionCenter, memorylibrary:renderRepairMemoryLibrary, cleanup:renderCleanupCenter, brain:renderBrain, brainsettings:renderBrainSettings, visionsettings:renderVisionSettings, portalhub:renderCustomerPortalHub, techmode:renderTechMode, about:renderAboutLegal, login:renderLogin, account:renderAuthSettings, aiengine:renderAiEngine, realocr:renderRealOCR, filestorage:renderFileStorage, gpsmanager:renderGPSManager, repair:renderRepair, business:renderBusiness
 };
 function render(route=currentRoute()){
   try{
