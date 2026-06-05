@@ -132,3 +132,5 @@ V6.2 AUTH + DATABASE FOUNDATION: Supabase Auth sign-in/create/forgot hooks, Loca
 V6.2a HOTFIX: Added missing ensureSettingsV48/applyUiSettings compatibility functions so Home loads correctly.
 
 V6.2b STARTUP FIX: Added startup-home-fix.js to force Home render immediately on app open, bad hash fallback, and blank-screen recovery.
+
+V6.3 CUSTOMER QUOTE APPROVAL: Send Quotes center, approval links, customer approval portal, approve/decline, signature, status tracking, approved quote creates Work Order, convert to Invoice.

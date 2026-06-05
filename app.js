@@ -122,6 +122,7 @@ function renderHome(){
     </section>
 
     <section class="v5-hub-grid">
+      <button class="v5-hub-card" data-route="sendquotes"><b>Send Quotes</b><small>Customer approval • signature • status</small></button>
       <button class="v5-hub-card" data-route="account"><b>Account / Roles</b><small>Login • users • permissions</small></button>
       <button class="v5-hub-card" data-route="dashboard"><b>Business Dashboard</b><small>Revenue • quotes • invoices • jobs</small></button>
       <button class="v5-hub-card" data-route="aioperator"><b>AI Operator</b><small>Ask AI to build anything</small></button>
@@ -766,7 +767,8 @@ function renderQuotes(){
   const n=id=>Number(v(id)||0);
   const calc=()=> n("quoteHours")*n("quoteRate")+n("quoteCall")+n("quoteTravel")+n("quoteParts")+n("quoteSupplies")+n("quoteFees")+n("quoteMisc");
   $("#aiBuildQuote").onclick=()=>{const job=v("quoteAiJob").toLowerCase();$("#quoteDesc").value=v("quoteAiJob");let hours=3.5,parts="Parts to verify by VIN / supplier",supplies=25;if(job.includes("water pump")){hours=3.5;parts="Water pump\\nGasket/seal kit\\nBelt if needed\\nCoolant\\nShop supplies";supplies=35}if(job.includes("clutch")){hours=11.5;parts="Clutch kit\\nPilot bearing\\nFlywheel resurface/replacement as needed\\nTransmission fluid if needed";supplies=45}if(job.includes("wheel seal")){hours=2.5;parts="Wheel seal\\nHub cap gasket\\nGear oil\\nBrake clean/shop supplies";supplies=25}if(job.includes("brake")){hours=3.0;parts="Brake parts as applicable\\nHardware kit\\nDrums/rotors if needed\\nShop supplies";supplies=25}$("#quoteHours").value=hours;$("#quotePartsList").value=parts;$("#quoteSupplies").value=supplies;$("#quotePartSource").value="Parts price/location to be verified before final approval";toast("AI quote filled");buildQuotePreview()};
-  function buildQuotePreview(){const labor=n("quoteHours")*n("quoteRate");const subtotal=calc();const disclaimer="Estimate only. Final price may increase or decrease based on additional labor, seized/broken hardware, hidden damage, diagnostic findings, parts availability, freight, shop supplies, taxes/fees, travel, or extra time required to complete the repair. Customer approval required before additional work is performed. Parts pricing and availability may change until purchased.";$("#quotePreviewWrap").innerHTML=`<div class="pro-doc-preview"><div class="pro-doc-top"><div class="pro-doc-logo"><div class="doc-rw">RW</div><div><h3>${state.settings.shop || "Rolling Wrench Diesel"}</h3><p>${state.settings.phone || ""} • Mobile Diesel Repair</p></div></div><div class="doc-type"><b>Quote</b><small>${new Date().toLocaleDateString()}</small></div></div><div class="pro-info-grid"><div class="pro-info-box"><b>Customer</b><span>${v("quoteCustomer") || "Customer"}</span></div><div class="pro-info-box"><b>Truck / VIN</b><span>${v("quoteTruck") || "Truck / VIN"}</span></div><div class="pro-info-box"><b>Job</b><span>${v("quoteDesc") || "Repair estimate"}</span></div><div class="pro-info-box"><b>Parts Source</b><span>${v("quotePartSource") || "To be verified"}</span></div></div><table class="pro-table"><thead><tr><th>Description</th><th>Qty/Hours</th><th>Rate/Cost</th><th>Total</th></tr></thead><tbody><tr><td>Labor</td><td>${v("quoteHours")} hrs</td><td>${money(n("quoteRate"))}</td><td>${money(labor)}</td></tr><tr><td>Service Call</td><td>1</td><td>${money(n("quoteCall"))}</td><td>${money(n("quoteCall"))}</td></tr><tr><td>Travel / Mileage</td><td>1</td><td>${money(n("quoteTravel"))}</td><td>${money(n("quoteTravel"))}</td></tr><tr><td>Parts<br><small>${v("quotePartsList").replaceAll("\\n","<br>")}</small></td><td>1</td><td>${money(n("quoteParts"))}</td><td>${money(n("quoteParts"))}</td></tr><tr><td>Supplies / Fees / Misc</td><td>1</td><td>${money(n("quoteSupplies")+n("quoteFees")+n("quoteMisc"))}</td><td>${money(n("quoteSupplies")+n("quoteFees")+n("quoteMisc"))}</td></tr></tbody></table><div class="pro-total-box"><div class="pro-total-row"><span>Subtotal</span><b>${money(subtotal)}</b></div><div class="pro-total-row grand"><span>Estimated Total</span><b>${money(subtotal)}</b></div></div><div class="pro-note"><b>Estimate Disclaimer:</b> ${disclaimer}</div>${docSignatureHtml("quote")}</div><div class="pro-actions"><button id="convertQuoteInvoice">Convert to Invoice</button><button id="saveQuoteAgain">Save Quote</button><button onclick="window.print()">Print / Save PDF</button></div>`;$("#saveQuoteAgain").onclick=()=>$("#saveQuote").click();$("#convertQuoteInvoice").onclick=()=>{state.invoices.push({customer:v("quoteCustomer"),truck:v("quoteTruck"),work:v("quoteDesc"),total:subtotal,date:new Date().toLocaleString(),fromQuote:true});saveState();toast("Converted to invoice")}}
+  function buildQuotePreview(){const labor=n("quoteHours")*n("quoteRate");const subtotal=calc();const disclaimer="Estimate only. Final price may increase or decrease based on additional labor, seized/broken hardware, hidden damage, diagnostic findings, parts availability, freight, shop supplies, taxes/fees, travel, or extra time required to complete the repair. Customer approval required before additional work is performed. Parts pricing and availability may change until purchased.";$("#quotePreviewWrap").innerHTML=`<div class="pro-doc-preview"><div class="pro-doc-top"><div class="pro-doc-logo"><div class="doc-rw">RW</div><div><h3>${state.settings.shop || "Rolling Wrench Diesel"}</h3><p>${state.settings.phone || ""} • Mobile Diesel Repair</p></div></div><div class="doc-type"><b>Quote</b><small>${new Date().toLocaleDateString()}</small></div></div><div class="pro-info-grid"><div class="pro-info-box"><b>Customer</b><span>${v("quoteCustomer") || "Customer"}</span></div><div class="pro-info-box"><b>Truck / VIN</b><span>${v("quoteTruck") || "Truck / VIN"}</span></div><div class="pro-info-box"><b>Job</b><span>${v("quoteDesc") || "Repair estimate"}</span></div><div class="pro-info-box"><b>Parts Source</b><span>${v("quotePartSource") || "To be verified"}</span></div></div><table class="pro-table"><thead><tr><th>Description</th><th>Qty/Hours</th><th>Rate/Cost</th><th>Total</th></tr></thead><tbody><tr><td>Labor</td><td>${v("quoteHours")} hrs</td><td>${money(n("quoteRate"))}</td><td>${money(labor)}</td></tr><tr><td>Service Call</td><td>1</td><td>${money(n("quoteCall"))}</td><td>${money(n("quoteCall"))}</td></tr><tr><td>Travel / Mileage</td><td>1</td><td>${money(n("quoteTravel"))}</td><td>${money(n("quoteTravel"))}</td></tr><tr><td>Parts<br><small>${v("quotePartsList").replaceAll("\\n","<br>")}</small></td><td>1</td><td>${money(n("quoteParts"))}</td><td>${money(n("quoteParts"))}</td></tr><tr><td>Supplies / Fees / Misc</td><td>1</td><td>${money(n("quoteSupplies")+n("quoteFees")+n("quoteMisc"))}</td><td>${money(n("quoteSupplies")+n("quoteFees")+n("quoteMisc"))}</td></tr></tbody></table><div class="pro-total-box"><div class="pro-total-row"><span>Subtotal</span><b>${money(subtotal)}</b></div><div class="pro-total-row grand"><span>Estimated Total</span><b>${money(subtotal)}</b></div></div><div class="pro-note"><b>Estimate Disclaimer:</b> ${disclaimer}</div>${docSignatureHtml("quote")}</div><div class="pro-actions"><button id="convertQuoteInvoice">Convert to Invoice</button><button id="sendQuoteCustomer">Send to Customer</button><button id="saveQuoteAgain">Save Quote</button><button onclick="window.print()">Print / Save PDF</button></div>`;if($("#sendQuoteCustomer")) $("#sendQuoteCustomer").onclick=()=>{ $("#saveQuote").click(); const idx=state.quotes.length-1; makeQuoteApproval(idx); toast("Quote link ready"); setRoute("sendquotes"); };
+    $("#saveQuoteAgain").onclick=()=>$("#saveQuote").click();$("#convertQuoteInvoice").onclick=()=>{state.invoices.push({customer:v("quoteCustomer"),truck:v("quoteTruck"),work:v("quoteDesc"),total:subtotal,date:new Date().toLocaleString(),fromQuote:true});saveState();toast("Converted to invoice")}}
   $("#previewQuote").onclick=buildQuotePreview;
   $("#saveQuote").onclick=()=>{state.quotes.push({customer:v("quoteCustomer"),truck:v("quoteTruck"),desc:v("quoteDesc"),hours:n("quoteHours"),rate:n("quoteRate"),parts:v("quotePartsList"),source:v("quotePartSource"),total:calc(),date:new Date().toLocaleString()});addTruckHistory("Quote", `${v("quoteDesc")} - ${money(calc())}`);saveState();toast("Quote saved")};
 }
@@ -2001,11 +2003,113 @@ if(typeof applyUiSettings !== "function"){
   }
 }
 
+
+function ensureV63(){
+  if(typeof ensureV6 === "function") ensureV6();
+  if(!state.quoteApprovals) state.quoteApprovals = [];
+}
+function quoteLegalText(){
+  return "Pricing is based on visible conditions at the time of estimate. Additional repairs, labor, parts, seized or broken hardware, hidden damage, diagnostic findings, parts availability, travel, freight, shop supplies, taxes, card fees, or extra time may change the final invoice amount. Final price may increase or decrease based on actual repair requirements. Customer authorization is required before additional charges are incurred.";
+}
+function makeQuoteApproval(quoteIndex){
+  ensureV63();
+  const q = state.quotes[quoteIndex];
+  if(!q) return null;
+  const id = q.approvalId || ("RWQ-" + Date.now());
+  q.approvalId = id;
+  q.status = q.status || "Pending";
+  const link = `${location.origin}${location.pathname}#quoteapproval-${id}`;
+  let rec = state.quoteApprovals.find(a=>a.id===id);
+  if(!rec){
+    rec = {id,quoteIndex,link,status:q.status,created:new Date().toLocaleString(),customer:q.customer || "",total:q.total || 0};
+    state.quoteApprovals.unshift(rec);
+  }else{
+    Object.assign(rec,{quoteIndex,link,status:q.status,customer:q.customer || "",total:q.total || 0});
+  }
+  saveState();
+  return {id,link,quote:q};
+}
+function findQuoteByApprovalId(id){
+  ensureV63();
+  let index = state.quotes.findIndex(q=>q.approvalId===id);
+  if(index < 0){
+    const rec = state.quoteApprovals.find(a=>a.id===id);
+    if(rec) index = rec.quoteIndex;
+  }
+  return {quote:index>=0 ? state.quotes[index] : null,index};
+}
+function quoteStatusPill(status){
+  const s=(status || "Pending").toLowerCase();
+  return `<span class="quote-status-pill ${s}">${status || "Pending"}</span>`;
+}
+function approveQuote(id,name,sig){
+  const f=findQuoteByApprovalId(id);
+  if(!f.quote) return false;
+  f.quote.status="Approved";
+  f.quote.approvedAt=new Date().toLocaleString();
+  f.quote.approvedBy=name || "Customer / Driver";
+  f.quote.approvalSignature=sig || null;
+  const rec=state.quoteApprovals.find(a=>a.id===id);
+  if(rec) Object.assign(rec,{status:"Approved",approvedAt:f.quote.approvedAt,approvedBy:f.quote.approvedBy});
+  state.workorders.push({customer:f.quote.customer,truck:f.quote.truck,desc:f.quote.desc || "Approved quote",status:"Approved Quote",quoteId:id,date:new Date().toLocaleString()});
+  saveState();
+  return true;
+}
+function declineQuote(id,name,reason){
+  const f=findQuoteByApprovalId(id);
+  if(!f.quote) return false;
+  f.quote.status="Declined";
+  f.quote.declinedAt=new Date().toLocaleString();
+  f.quote.declinedBy=name || "Customer / Driver";
+  f.quote.declineReason=reason || "";
+  const rec=state.quoteApprovals.find(a=>a.id===id);
+  if(rec) Object.assign(rec,{status:"Declined",declinedAt:f.quote.declinedAt,declinedBy:f.quote.declinedBy});
+  saveState();
+  return true;
+}
+function renderQuoteApprovalPortal(id){
+  ensureV63();
+  const f=findQuoteByApprovalId(id), q=f.quote;
+  if(!q){$("#screen").innerHTML=`${pageHead("Quote Approval","",false)}<section class="error-panel"><b>Quote Not Found</b><p>This approval link does not match a saved quote on this device yet.</p></section>`;bindPageTools();return;}
+  $("#screen").innerHTML=`${pageHead("Quote Approval","",false)}
+  <section class="customer-approval-card">
+    <div class="approval-header"><div class="approval-logo">RW</div><div><h2>Quote Approval</h2><p>Rolling Wrench Diesel LLC</p></div></div>
+    <div>${quoteStatusPill(q.status || "Pending")}</div>
+    <div class="approval-summary">
+      <div class="approval-box"><b>Customer</b><span>${q.customer || state.truck.customer || "Customer"}</span></div>
+      <div class="approval-box"><b>Truck / VIN</b><span>${q.truck || state.truck.unit || "Truck"}</span></div>
+      <div class="approval-box"><b>Repair</b><span>${q.desc || "Repair estimate"}</span></div>
+      <div class="approval-box"><b>Estimated Total</b><span>${money(q.total || 0)}</span></div>
+    </div>
+    <div class="approval-legal"><b>Authorization Terms:</b><br>${quoteLegalText()}</div>
+    ${typeof signatureBlock==="function" ? signatureBlock("customerQuote","Customer / Driver Approval Signature") : ""}
+    <label>Printed Name<input id="approvalName" placeholder="Customer / driver name"></label>
+    <label>Decline Reason / Notes<textarea id="declineReason" placeholder="Only needed if declining"></textarea></label>
+    <div class="approval-actions"><button class="approve" id="approveQuoteBtn">Approve & Sign</button><button class="decline" id="declineQuoteBtn">Decline</button></div>
+  </section>`;
+  bindPageTools();
+  if(typeof setupSignaturePad==="function") setupSignaturePad("customerQuote");
+  $("#approveQuoteBtn").onclick=()=>{const sig=typeof saveSignature==="function"?saveSignature("customerQuote"):null;if(approveQuote(id,$("#approvalName").value,sig)){toast("Quote approved");renderQuoteApprovalPortal(id);}};
+  $("#declineQuoteBtn").onclick=()=>{if(declineQuote(id,$("#approvalName").value,$("#declineReason").value)){toast("Quote declined");renderQuoteApprovalPortal(id);}};
+}
+function renderQuoteSendCenter(){
+  ensureV63();
+  $("#screen").innerHTML=`${pageHead("Send Quotes","",false)}
+  <section class="form-panel">
+    <div class="backend-banner"><b>Customer Quote Approval</b><small>Create approval links customers can open on phone, tablet, or computer. They can approve, decline, and sign.</small></div>
+    ${(state.quotes||[]).length ? state.quotes.map((q,i)=>`<div class="quote-list-card"><b>${q.customer || "Customer"} — ${money(q.total || 0)}</b><small>${q.desc || "Quote"}<br>${quoteStatusPill(q.status || "Pending")}</small><div class="smart-action-row"><button data-create-approval="${i}">Send Link</button><button data-open-approval="${q.approvalId || ""}">Open Portal</button><button data-convert-invoice="${i}">Invoice</button></div><div class="share-link-box" id="quoteLink_${i}">${q.approvalId ? `${location.origin}${location.pathname}#quoteapproval-${q.approvalId}` : "No link yet"}</div></div>`).join("") : `<div class="output">No quotes saved yet. Create a Smart Quote first.</div>`}
+  </section>`;
+  bindPageTools();
+  $$("[data-create-approval]").forEach(btn=>btn.onclick=()=>{const i=Number(btn.dataset.createApproval);const a=makeQuoteApproval(i);$("#quoteLink_"+i).textContent=a.link;toast("Approval link ready");renderQuoteSendCenter();});
+  $$("[data-open-approval]").forEach(btn=>btn.onclick=()=>{const id=btn.dataset.openApproval;if(!id){toast("Create link first");return;}setRoute("quoteapproval-"+id);});
+  $$("[data-convert-invoice]").forEach(btn=>btn.onclick=()=>{const q=state.quotes[Number(btn.dataset.convertInvoice)];if(!q)return;state.invoices.push({customer:q.customer,truck:q.truck,work:q.desc,total:q.total,date:new Date().toLocaleString(),fromQuote:true,quoteId:q.approvalId||""});saveState();toast("Converted to invoice");});
+}
+
 const routes = {
   home:renderHome, clock:renderClock, truck:renderTruck, ai:renderAi, parts:renderParts, fault:renderFault,
   repairhud:renderRepairHud, quotes:renderQuotes, invoices:renderInvoices, workorders:renderWorkOrders,
   schedule:renderSchedule, customers:renderCustomers, pindrop:renderPinDrop, camera:renderCamera, reports:renderReports,
-  memory:renderMemory, suppliers:renderSuppliers, pmdue:renderPmDue, settings:renderSettingsSafe, alerts:renderAlerts, workflow:renderWorkflowHub, pmmanager:renderPMManager, inventory:renderInventory, supplierpricing:renderSupplierPricing, notifications:renderNotifications, signin:renderSignInPreview, supabase:renderSupabaseSync, v52:renderV52Dashboard, dashboard:renderBusinessDashboard, aioperator:renderAIOperator, photointel:renderPhotoIntelligence, schedulecommand:renderScheduleCommand, customerportal:renderCustomerPortal, techmode:renderTechMode, about:renderAboutLegal, login:renderLogin, account:renderAuthSettings, aiengine:renderAiEngine, realocr:renderRealOCR, filestorage:renderFileStorage, gpsmanager:renderGPSManager, repair:renderRepair, business:renderBusiness
+  memory:renderMemory, suppliers:renderSuppliers, pmdue:renderPmDue, settings:renderSettingsSafe, alerts:renderAlerts, workflow:renderWorkflowHub, pmmanager:renderPMManager, inventory:renderInventory, supplierpricing:renderSupplierPricing, notifications:renderNotifications, signin:renderSignInPreview, supabase:renderSupabaseSync, v52:renderV52Dashboard, dashboard:renderBusinessDashboard, aioperator:renderAIOperator, photointel:renderPhotoIntelligence, schedulecommand:renderScheduleCommand, customerportal:renderCustomerPortal, sendquotes:renderQuoteSendCenter, techmode:renderTechMode, about:renderAboutLegal, login:renderLogin, account:renderAuthSettings, aiengine:renderAiEngine, realocr:renderRealOCR, filestorage:renderFileStorage, gpsmanager:renderGPSManager, repair:renderRepair, business:renderBusiness
 };
 function render(route=currentRoute()){
   try{
@@ -2016,6 +2120,7 @@ function render(route=currentRoute()){
       $("#screen").innerHTML = `<section class="locked-screen"><b>Access Restricted</b><p>Your role does not have access to ${route}.</p><button class="action-btn primary" data-route="home">Go Home</button></section>`;
       return;
     }
+    if(route && route.startsWith("quoteapproval-")){ renderQuoteApprovalPortal(route.replace("quoteapproval-","")); return; }
     const fn=routes[route] || renderHome;
     fn();
     $$(".bottom-nav button").forEach(b=>b.classList.toggle("active", b.dataset.route===route || (route==="home" && b.dataset.route==="home")));
