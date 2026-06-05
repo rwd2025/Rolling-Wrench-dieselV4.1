@@ -3741,11 +3741,144 @@ function v71aPatchAiEntrypoints(){
   document.querySelectorAll('[data-route="ai"], [data-route="brain"]').forEach(el=>el.setAttribute("data-route","brain"));
 }
 
-const routes = {
-  home:renderHome, clock:renderClock, truck:renderTruck, ai:renderBrainChatGPT, parts:renderParts, fault:renderFault,
+
+function v72ShortReply(intent,text,quote){
+  if(intent==="quote" && quote){
+    return `I found a clutch replacement quote.\n\nLabor: ${quote.hours} hrs\nService Call: ${money(quote.serviceCall)}\nEstimated Total: ${money(quote.total)}\n\nI saved a quote draft.`;
+  }
+  if(intent==="invoice") return "I built an invoice draft and saved it to Invoices.";
+  if(intent==="memory") return "I saved that to Repair Memory.";
+  if(intent==="diagnostic") return "I built a diagnostic workflow and saved it to Fault Doctor notes.";
+  if(intent==="parts") return "I saved a parts lookup note. Exact parts still need VIN/OEM verification.";
+  return "I handled that command and saved it where it belongs.";
+}
+function v72LastQuote(){
+  return (state.quotes||[]).find(q=>q.ai || q.status==="Draft") || (state.quotes||[])[0] || null;
+}
+function v72RenderQuoteCard(q){
+  if(!q) return "";
+  return `<div class="ai-v72-card">
+    <h3>Clutch Quote Detected</h3>
+    <div class="ai-v72-kpis">
+      <div class="ai-v72-kpi"><small>Labor</small><b>${q.hours || "11.5"} hrs</b></div>
+      <div class="ai-v72-kpi"><small>Service</small><b>${money(q.serviceCall || 250)}</b></div>
+      <div class="ai-v72-kpi"><small>Total</small><b>${money(q.total || 0)}</b></div>
+    </div>
+    <div class="ai-v72-msg bot" style="max-width:100%;margin:0;">
+      <b>Parts</b>${String(q.parts || "Clutch kit\nPilot bearing\nRelease bearing\nFlywheel inspection").replace(/\\n/g,"\n")}
+    </div>
+    <div class="ai-v72-actions">
+      <button class="primary" data-v72-action="openQuote">Open Quote</button>
+      <button data-v72-action="findParts">Find Parts</button>
+      <button data-v72-action="sendQuote">Send Customer</button>
+      <button data-v72-action="invoiceQuote">Build Invoice</button>
+    </div>
+  </div>`;
+}
+function v72PushMessage(role,text,kind,meta){
+  state.brainChats = state.brainChats || [];
+  state.brainChats.push({role,text,kind:kind||"",meta:meta||null,date:new Date().toLocaleString()});
+  saveState();
+}
+function v72HandleFollowup(text){
+  const q=(text||"").toLowerCase().trim();
+  if(["send to quotes","open quote","open quotes","go to quote","go to quotes"].includes(q)){ setRoute("quotes"); return true; }
+  if(["send to invoice","build invoice","open invoice","open invoices"].includes(q)){
+    const quote=v72LastQuote();
+    if(quote){ state.invoices.unshift({customer:quote.customer,truck:quote.truck,work:quote.desc,total:quote.total,status:"Draft",fromQuote:true,date:new Date().toLocaleString()}); saveState(); }
+    setRoute("invoices"); return true;
+  }
+  if(["find parts","parts"].includes(q)){ setRoute("parts"); return true; }
+  return false;
+}
+function renderBrainV72(){
+  ensureV70();
+  document.body.classList.add("ai-lock");
+  const ctx = brainContext ? brainContext() : {};
+  $("#screen").innerHTML = `<section class="ai-v72-shell">
+    <div class="ai-v72-head">
+      <div class="ai-v72-title">
+        <div class="ai-v72-logo">RW</div>
+        <div><b>Ask Rolling Wrench AI</b><small>${ctx.customer || "No customer"} • ${ctx.truck || "No truck"} • ${ctx.engine || "Engine unknown"}</small></div>
+      </div>
+      <button class="ai-v72-close" id="v72Close">Close</button>
+    </div>
+    <div class="ai-v72-scroll" id="v72Scroll">
+      <div class="ai-v72-chiprow">
+        <button data-v72-chip="Build a clutch quote for a 2014 Peterbilt with an ISX">Clutch Quote</button>
+        <button data-v72-chip="Build invoice for replacing water pump and belt">Invoice</button>
+        <button data-v72-chip="Diagnose SPN 3364 FMI 2">Fault Code</button>
+        <button data-v72-chip="Save repair memory for X15 overheating during regen">Repair Memory</button>
+        <button data-route="vision">Scan Photo</button>
+      </div>
+      ${(state.brainChats||[]).map(m=>{
+        if(m.kind==="quote_card") return v72RenderQuoteCard(m.meta);
+        return `<div class="ai-v72-msg ${m.role==="user"?"user":"bot"}"><b>${m.role==="user"?"You":"Rolling Wrench AI"}</b>${String(m.text||"").replace(/\\n/g,"\n")}</div>`;
+      }).join("") || `<div class="ai-v72-msg bot"><b>Rolling Wrench AI</b>Ask anything. I’ll keep this chat clean and create quotes/invoices/work orders in their own screens.</div>`}
+    </div>
+    <div class="ai-v72-compose-wrap">
+      <div class="ai-v72-compose">
+        <button class="ai-v72-plus" id="v72Plus">+</button>
+        <div class="ai-v72-inputbox">
+          <input id="v72Input" placeholder="Ask Rolling Wrench AI anything..." />
+          <button class="ai-v72-mic" id="v72Mic">🎙</button>
+        </div>
+        <button class="ai-v72-voice" id="v72Voice">▮▮</button>
+        <button class="ai-v72-send" id="v72Send">➤</button>
+      </div>
+    </div>
+  </section>`;
+  bindPageTools();
+  const sc=$("#v72Scroll");
+  if(sc) sc.scrollTop=sc.scrollHeight;
+
+  async function run(text){
+    text=(text||"").trim();
+    if(!text) return;
+    if(v72HandleFollowup(text)) return;
+    v72PushMessage("user",text);
+    const intent=brainIntent(text);
+    if(intent==="quote"){
+      const quote=v71aQuoteForRequest ? v71aQuoteForRequest(text) : {hours:11.5,serviceCall:250,total:1847.50,parts:"Clutch kit\nPilot bearing\nRelease bearing",desc:text,status:"Draft",ai:true,date:new Date().toLocaleString()};
+      state.quotes.unshift(quote);
+      v72PushMessage("ai",v72ShortReply(intent,text,quote));
+      v72PushMessage("ai","quote-card","quote_card",quote);
+      if(typeof brainLog==="function") brainLog("Quote Card Created", text);
+      saveState();
+      renderBrainV72();
+      return;
+    }
+    const answer=typeof v71aBrainAnswer==="function" ? await v71aBrainAnswer(text) : (typeof brainBuildProfessionalText==="function" ? brainBuildProfessionalText(intent,text) : "Saved.");
+    if(typeof v71aRouteAction==="function") v71aRouteAction(intent,text,answer);
+    v72PushMessage("ai",v72ShortReply(intent,text,null));
+    renderBrainV72();
+  }
+
+  $("#v72Send").onclick=()=>run($("#v72Input").value);
+  $("#v72Input").onkeydown=e=>{if(e.key==="Enter")run($("#v72Input").value);};
+  $("#v72Mic").onclick=()=>{if(typeof startVoiceToField==="function") startVoiceToField("v72Input"); else toast("Voice not available");};
+  $("#v72Voice").onclick=()=>{if(typeof startVoiceToField==="function") startVoiceToField("v72Input"); else toast("Voice mode coming next");};
+  $("#v72Plus").onclick=()=>setRoute("vision");
+  $("#v72Close").onclick=()=>{document.body.classList.remove("ai-lock");setRoute("home");};
+  $$("[data-v72-chip]").forEach(b=>b.onclick=()=>run(b.dataset.v72Chip));
+  $$("[data-v72-action]").forEach(b=>b.onclick=()=>{
+    const a=b.dataset.v72Action;
+    if(a==="openQuote") setRoute("quotes");
+    if(a==="findParts") setRoute("parts");
+    if(a==="sendQuote") setRoute("sendquotes");
+    if(a==="invoiceQuote"){
+      const quote=v72LastQuote();
+      if(quote){ state.invoices.unshift({customer:quote.customer,truck:quote.truck,work:quote.desc,total:quote.total,status:"Draft",fromQuote:true,date:new Date().toLocaleString()}); saveState(); }
+      setRoute("invoices");
+    }
+  });
+}
+
+const routes = { ai:renderBrainV72, brain:renderBrainV72,
+  home:renderHome, clock:renderClock, truck:renderTruck,  parts:renderParts, fault:renderFault,
   repairhud:renderRepairHud, quotes:renderQuotes, invoices:renderInvoices, workorders:renderWorkOrders,
   schedule:renderSchedule, customers:renderCustomers, pindrop:renderPinDrop, camera:renderCamera, reports:renderReports,
-  memory:renderRepairMemoryLibrary, suppliers:renderSuppliers, pmdue:renderPmDue, settings:renderSettingsSafe, alerts:renderAlerts, workflow:renderWorkflowHub, pmmanager:renderPMManager, inventory:renderInventory, supplierpricing:renderSupplierPricing, notifications:renderNotifications, signin:renderSignInPreview, supabase:renderSupabaseSync, v52:renderV52Dashboard, dashboard:renderBusinessDashboard, aioperator:renderAIOperator, photointel:renderPhotoIntelligence, schedulecommand:renderScheduleCommand, customerportal:renderCustomerPortalHub, sendquotes:renderQuoteSendCenter, sendinvoices:renderInvoiceSendCenter, stability:renderStabilityCenter, externallinks:renderExternalLinksCenter, storageprep:renderStoragePrep, backend:renderBackendCenter, backendsetup:renderBackendSetup, communications:renderCommunicationCenter, templates:renderCommunicationTemplates, fileuploads:renderFileUploadCenter, filehistory:renderFileHistory, vision:renderVisionCenter, memorylibrary:renderRepairMemoryLibrary, cleanup:renderCleanupCenter, ai:renderBrainChatGPT, brain:renderBrainChatGPT, brainsettings:renderBrainSettings, visionsettings:renderVisionSettings, portalhub:renderCustomerPortalHub, techmode:renderTechMode, about:renderAboutLegal, login:renderLogin, account:renderAuthSettings, aiengine:renderAiEngine, realocr:renderRealOCR, filestorage:renderFileStorage, gpsmanager:renderGPSManager, repair:renderRepair, business:renderBusiness
+  memory:renderRepairMemoryLibrary, suppliers:renderSuppliers, pmdue:renderPmDue, settings:renderSettingsSafe, alerts:renderAlerts, workflow:renderWorkflowHub, pmmanager:renderPMManager, inventory:renderInventory, supplierpricing:renderSupplierPricing, notifications:renderNotifications, signin:renderSignInPreview, supabase:renderSupabaseSync, v52:renderV52Dashboard, dashboard:renderBusinessDashboard, aioperator:renderAIOperator, photointel:renderPhotoIntelligence, schedulecommand:renderScheduleCommand, customerportal:renderCustomerPortalHub, sendquotes:renderQuoteSendCenter, sendinvoices:renderInvoiceSendCenter, stability:renderStabilityCenter, externallinks:renderExternalLinksCenter, storageprep:renderStoragePrep, backend:renderBackendCenter, backendsetup:renderBackendSetup, communications:renderCommunicationCenter, templates:renderCommunicationTemplates, fileuploads:renderFileUploadCenter, filehistory:renderFileHistory, vision:renderVisionCenter, memorylibrary:renderRepairMemoryLibrary, cleanup:renderCleanupCenter,   brainsettings:renderBrainSettings, visionsettings:renderVisionSettings, portalhub:renderCustomerPortalHub, techmode:renderTechMode, about:renderAboutLegal, login:renderLogin, account:renderAuthSettings, aiengine:renderAiEngine, realocr:renderRealOCR, filestorage:renderFileStorage, gpsmanager:renderGPSManager, repair:renderRepair, business:renderBusiness
 };
 function render(route=currentRoute()){
   try{
@@ -3758,7 +3891,7 @@ function render(route=currentRoute()){
     }
     if(route && route.startsWith("quoteapproval-")){ renderQuoteApprovalPortal(route.replace("quoteapproval-","")); return; }
     if(route && route.startsWith("invoiceportal-")){ renderInvoicePortal(route.replace("invoiceportal-","")); return; }
-    if(route !== "brain" && route !== "ai") document.body.classList.remove("ai-full-open");
+    if(route !== "brain" && route !== "ai"){ document.body.classList.remove("ai-full-open"); document.body.classList.remove("ai-lock"); }
     const fn=routes[route] || renderHome;
     fn();
     $$(".bottom-nav button").forEach(b=>b.classList.toggle("active", b.dataset.route===route || (route==="home" && b.dataset.route==="home")));

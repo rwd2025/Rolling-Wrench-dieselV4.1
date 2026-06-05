@@ -219,3 +219,12 @@ V7.1a AI SCREEN + QUOTE FIX:
 - Build a clutch quote for a 2014 Peterbilt with an ISX now creates an exact clutch quote draft:
   11.5 hrs, $135/hr, $250 service call, clutch parts list, disclaimer.
 - AI creates quote record automatically.
+
+V7.2 AI CHAT LAYOUT FIX:
+- Chat input stays fixed and visible at the bottom like ChatGPT.
+- Plus button and input are together like ChatGPT.
+- Message area scrolls independently.
+- Quote no longer dumps full quote into chat.
+- AI creates compact quote card with action buttons.
+- Follow-up command "Send to Quotes" opens Quotes instead of creating a new quote.
+- Bottom nav hidden while AI chat is open.
