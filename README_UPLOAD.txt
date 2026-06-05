@@ -228,3 +228,11 @@ V7.2 AI CHAT LAYOUT FIX:
 - AI creates compact quote card with action buttons.
 - Follow-up command "Send to Quotes" opens Quotes instead of creating a new quote.
 - Bottom nav hidden while AI chat is open.
+
+V7.2a AI CLEAR + SEND-TO-QUOTES FIX:
+- Added Clear button in AI chat header.
+- "Clear", "clear chat", "new chat" clears AI conversation.
+- "Send to quotes", "save quote", "open quotes" opens the saved quote draft instead of creating a new generic quote.
+- Added hard guard so "send to quotes" cannot be interpreted as a new job.
+
+V8.0 RW AI BRAIN: ChatGPT/Gemini-style assistant, clean cards, persistent truck/engine context, quote/invoice/memory/diagnostic routing, clear chat, fixed bottom input.

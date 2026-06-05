@@ -3734,7 +3734,7 @@ function renderBrainChatGPT(){
   $("#aiChatInput").onkeydown=e=>{if(e.key==="Enter")run($("#aiChatInput").value);};
   $("#aiVoice").onclick=()=>{if(typeof startVoiceToField==="function") startVoiceToField("aiChatInput"); else toast("Voice not available");};
   $("#aiAttach").onclick=()=>setRoute("vision");
-  $("#aiClose").onclick=()=>{document.body.classList.remove("ai-full-open");setRoute("home");};
+  $("#aiClose").onclick=()=>{document.body.classList.remove("ai-full-open");document.body.classList.remove("rw-ai-mode");setRoute("home");};
   $$("[data-ai-chip]").forEach(b=>b.onclick=()=>run(b.dataset.aiChip));
 }
 function v71aPatchAiEntrypoints(){
@@ -3782,15 +3782,31 @@ function v72PushMessage(role,text,kind,meta){
 }
 function v72HandleFollowup(text){
   const q=(text||"").toLowerCase().trim();
-  if(["send to quotes","open quote","open quotes","go to quote","go to quotes"].includes(q)){ setRoute("quotes"); return true; }
-  if(["send to invoice","build invoice","open invoice","open invoices"].includes(q)){
-    const quote=v72LastQuote();
-    if(quote){ state.invoices.unshift({customer:quote.customer,truck:quote.truck,work:quote.desc,total:quote.total,status:"Draft",fromQuote:true,date:new Date().toLocaleString()}); saveState(); }
-    setRoute("invoices"); return true;
+  if(v72aIsClear(text)){
+    state.brainChats=[];
+    saveState();
+    renderBrainV72();
+    return true;
   }
-  if(["find parts","parts"].includes(q)){ setRoute("parts"); return true; }
+  if(v72aIsSendToQuotes(text)){
+    return v72aOpenLastQuote();
+  }
+  if(["send to invoice","open invoice","open invoices"].includes(q)){
+    const quote=v72aLastQuote();
+    if(quote){
+      state.invoices.unshift({customer:quote.customer,truck:quote.truck,work:quote.desc,total:quote.total,status:"Draft",fromQuote:true,date:new Date().toLocaleString()});
+      saveState();
+    }
+    setRoute("invoices");
+    return true;
+  }
+  if(["find parts","parts"].includes(q)){
+    setRoute("parts");
+    return true;
+  }
   return false;
 }
+
 function renderBrainV72(){
   ensureV70();
   document.body.classList.add("ai-lock");
@@ -3801,7 +3817,7 @@ function renderBrainV72(){
         <div class="ai-v72-logo">RW</div>
         <div><b>Ask Rolling Wrench AI</b><small>${ctx.customer || "No customer"} • ${ctx.truck || "No truck"} • ${ctx.engine || "Engine unknown"}</small></div>
       </div>
-      <button class="ai-v72-close" id="v72Close">Close</button>
+      <div class="ai-v72-head-actions"><button class="ai-v72-clear" id="v72Clear">Clear</button><button class="ai-v72-close" id="v72Close">Close</button></div>
     </div>
     <div class="ai-v72-scroll" id="v72Scroll">
       <div class="ai-v72-chiprow">
@@ -3838,6 +3854,7 @@ function renderBrainV72(){
     if(v72HandleFollowup(text)) return;
     v72PushMessage("user",text);
     const intent=brainIntent(text);
+    if(v72aIsSendToQuotes(text)){ v72aOpenLastQuote(); return; }
     if(intent==="quote"){
       const quote=v71aQuoteForRequest ? v71aQuoteForRequest(text) : {hours:11.5,serviceCall:250,total:1847.50,parts:"Clutch kit\nPilot bearing\nRelease bearing",desc:text,status:"Draft",ai:true,date:new Date().toLocaleString()};
       state.quotes.unshift(quote);
@@ -3859,7 +3876,8 @@ function renderBrainV72(){
   $("#v72Mic").onclick=()=>{if(typeof startVoiceToField==="function") startVoiceToField("v72Input"); else toast("Voice not available");};
   $("#v72Voice").onclick=()=>{if(typeof startVoiceToField==="function") startVoiceToField("v72Input"); else toast("Voice mode coming next");};
   $("#v72Plus").onclick=()=>setRoute("vision");
-  $("#v72Close").onclick=()=>{document.body.classList.remove("ai-lock");setRoute("home");};
+  $("#v72Clear").onclick=()=>{state.brainChats=[];saveState();toast("Chat cleared");renderBrainV72();};
+  $("#v72Close").onclick=()=>{document.body.classList.remove("ai-lock");document.body.classList.remove("rw-ai-mode");setRoute("home");};
   $$("[data-v72-chip]").forEach(b=>b.onclick=()=>run(b.dataset.v72Chip));
   $$("[data-v72-action]").forEach(b=>b.onclick=()=>{
     const a=b.dataset.v72Action;
@@ -3874,7 +3892,20 @@ function renderBrainV72(){
   });
 }
 
-const routes = { ai:renderBrainV72, brain:renderBrainV72,
+
+function rw8Ensure(){ if(typeof ensureV70==="function") ensureV70(); state.rw8=state.rw8||{memory:{},lastCard:null}; state.brainChats=state.brainChats||[]; }
+function rw8Clean(s){return String(s||"").replace(/\\n/g,"\n").trim();}
+function rw8Context(){rw8Ensure();return{customer:state.rw8.memory.customer||state.truck?.customer||"",truck:state.rw8.memory.truck||state.truck?.unit||"",vin:state.rw8.memory.vin||state.truck?.vin||"",engine:state.rw8.memory.engine||state.truck?.engine||"",year:state.rw8.memory.year||"",make:state.rw8.memory.make||"",rate:Number(state.settings?.laborRate||state.settings?.rate||135),serviceCall:Number(state.settings?.serviceCall||250)}}
+function rw8ExtractMemory(text){const t=String(text||""),low=t.toLowerCase(),year=(t.match(/\b(19|20)\d{2}\b/)||[])[0];const makes=["peterbilt","kenworth","freightliner","international","volvo","mack","western star","ford","chevy","gmc","ram"];const make=makes.find(m=>low.includes(m));let engine="";if(low.includes("isx"))engine="Cummins ISX";if(low.includes("x15"))engine="Cummins X15";if(low.includes("dd15"))engine="Detroit DD15";if(low.includes("dd13"))engine="Detroit DD13";if(low.includes("mx13")||low.includes("mx-13"))engine="PACCAR MX-13";if(year||make||engine){state.rw8.memory.year=year||state.rw8.memory.year||"";state.rw8.memory.make=make?make.replace(/\b\w/g,c=>c.toUpperCase()):state.rw8.memory.make||"";state.rw8.memory.engine=engine||state.rw8.memory.engine||"";state.rw8.memory.truck=[state.rw8.memory.year,state.rw8.memory.make].filter(Boolean).join(" ")||state.rw8.memory.truck||"";}saveState();}
+function rw8Intent(text){const q=String(text||"").toLowerCase().trim();if(["clear","clear chat","new chat","reset"].includes(q))return"clear";if(["send to quotes","open quote","open quotes","save quote","go to quotes"].includes(q))return"open_quote";if(["find parts","parts"].includes(q))return"parts_action";if(["build invoice","open invoice","open invoices"].includes(q))return"invoice_action";if(q.includes("quote")||q.includes("estimate"))return"quote";if(q.includes("invoice")||q.includes("bill"))return"invoice";if(q.includes("spn")||q.includes("fmi")||q.includes("fault")||q.includes("code")||q.includes("diagnos"))return"diagnostic";if(q.includes("memory")||q.includes("save this fix")||q.includes("seen this before"))return"memory";if(q.includes("part")||q.includes("supplier")||q.includes("price"))return"parts";if(q.includes("photo")||q.includes("picture")||q.includes("scan")||q.includes("vin plate"))return"vision";return"general";}
+function rw8Quote(text){const ctx=rw8Context(),low=String(text).toLowerCase();let hours=3,title="Repair Quote",parts="Parts to be verified by VIN and supplier before final approval";if(low.includes("clutch")){hours=11.5;title="Clutch Replacement";parts="Clutch kit\nPilot bearing\nRelease bearing / throwout bearing\nFlywheel inspection / resurface or replacement if needed\nTransmission fluid if needed\nShop supplies";}else if(low.includes("water pump")){hours=4;title="Water Pump Replacement";parts="Water pump\nBelt if needed\nCoolant\nGaskets / seals\nShop supplies";}else if(low.includes("wheel seal")){hours=2.5;title="Wheel Seal Repair";parts="Wheel seal\nHub oil\nBrake clean\nPossible bearings if damaged";}const labor=hours*ctx.rate,service=ctx.serviceCall,supplies=low.includes("clutch")?45:25,total=labor+service+supplies;return{customer:ctx.customer,truck:ctx.truck||[ctx.year,ctx.make].filter(Boolean).join(" "),engine:ctx.engine,desc:text,title,hours,rate:ctx.rate,serviceCall:service,supplies,parts,partsSource:"Parts price/location to be verified before final approval",subtotal:total,total,status:"Draft",ai:true,date:new Date().toLocaleString(),professionalText:`${title}\n\nTruck: ${ctx.truck||"Verify truck"}\nEngine: ${ctx.engine||"Verify engine"}\nLabor: ${hours} hrs @ ${money(ctx.rate)}/hr\nService Call: ${money(service)}\nEstimated Total: ${money(total)}\n\nParts:\n${parts}`};}
+function rw8Push(role,text,kind,meta){state.brainChats.push({role,text:rw8Clean(text),kind:kind||"",meta:meta||null,date:new Date().toLocaleString()});saveState();}
+function rw8RenderCard(card){if(!card)return"";if(card.type==="quote"){const q=card.quote;return `<div class="rw8-card"><h3>${q.title||"Quote Detected"}</h3><div class="rw8-kpis"><div class="rw8-kpi"><small>Labor</small><b>${q.hours} hrs</b></div><div class="rw8-kpi"><small>Service</small><b>${money(q.serviceCall)}</b></div><div class="rw8-kpi"><small>Total</small><b>${money(q.total)}</b></div></div><div class="rw8-msg ai" style="max-width:100%;margin:0;"><b>Parts</b>${q.parts}</div><div class="rw8-actions"><button class="primary" data-rw8-action="openQuote">Open Quote</button><button data-rw8-action="findParts">Find Parts</button><button data-rw8-action="sendQuote">Send Customer</button><button data-rw8-action="invoiceQuote">Build Invoice</button></div></div>`;}if(card.type==="diagnostic"){return `<div class="rw8-card"><h3>Diagnostic Interview</h3><div class="rw8-msg ai" style="max-width:100%;margin:0;"><b>Next Questions</b>${card.text}</div><div class="rw8-actions"><button class="primary" data-rw8-action="saveMemory">Save Memory</button><button data-rw8-action="openFault">Open Fault Doctor</button></div></div>`;}return"";}
+function rw8Diagnostic(text){return`I can help diagnose that.\n\nAnswer these:\n1. Is the code active or inactive?\n2. What engine and truck?\n3. Any recent repair?\n4. What are the live data readings?\n5. Does it happen loaded, idle, regen, or driving?\n\nThen I’ll narrow it down step by step.`;}
+async function rw8Run(text){rw8Ensure();text=String(text||"").trim();if(!text)return;const intent=rw8Intent(text);if(intent==="clear"){state.brainChats=[];saveState();renderRW8Brain();return;}if(intent==="open_quote"){setRoute("quotes");return;}if(intent==="parts_action"){setRoute("parts");return;}if(intent==="invoice_action"){setRoute("invoices");return;}rw8ExtractMemory(text);rw8Push("user",text);if(intent==="quote"){const q=rw8Quote(text);state.quotes.unshift(q);state.rw8.lastCard={type:"quote",quote:q};saveState();rw8Push("ai",`I found a ${q.title.toLowerCase()}.\n\nLabor: ${q.hours} hrs\nEstimated Total: ${money(q.total)}\n\nI saved a quote draft.`);rw8Push("ai","quote card","card",state.rw8.lastCard);}else if(intent==="diagnostic"){const d=rw8Diagnostic(text);state.notes.unshift({type:"AI Diagnostic",note:d,date:new Date().toLocaleString()});state.rw8.lastCard={type:"diagnostic",text:d};saveState();rw8Push("ai",d,"card",state.rw8.lastCard);}else if(intent==="invoice"){const ctx=rw8Context();state.invoices.unshift({customer:ctx.customer,truck:ctx.truck,work:text,total:0,status:"Draft",ai:true,date:new Date().toLocaleString()});saveState();rw8Push("ai","I built an invoice draft and saved it to Invoices.");}else if(intent==="memory"){const ctx=rw8Context();if(typeof ensureV691==="function")ensureV691();state.repairMemory.unshift({id:"MEM-RW8-"+Date.now(),title:text.slice(0,55),complaint:text,cause:"",correction:"",customer:ctx.customer,truck:ctx.truck,engine:ctx.engine,keywords:text,status:"Saved",date:new Date().toLocaleString(),ai:true});saveState();rw8Push("ai","Saved to Repair Memory.");}else if(intent==="vision"){rw8Push("ai","Open OCR/Vision and attach the photo. Once the real vision backend is connected, I’ll read the image like ChatGPT/Gemini.");}else{rw8Push("ai","I’m following. Tell me if you want a quote, invoice, work order, repair memory, parts lookup, or diagnostic steps.");}renderRW8Brain();}
+function renderRW8Brain(){rw8Ensure();document.body.classList.add("rw-ai-mode");const ctx=rw8Context();$("#screen").innerHTML=`<section class="rw8-shell"><div class="rw8-head"><div class="rw8-brand"><div class="rw8-logo">RW</div><div><b>Rolling Wrench AI</b><small>${ctx.customer||"No customer"} • ${ctx.truck||"No truck"} • ${ctx.engine||"Engine unknown"}</small></div></div><div class="rw8-head-actions"><button class="rw8-clear" id="rw8Clear">Clear</button><button id="rw8Close">Close</button></div></div><div class="rw8-thread" id="rw8Thread"><div class="rw8-chips"><button data-rw8-chip="Build a clutch quote for a 2014 Peterbilt with an ISX">Clutch quote</button><button data-rw8-chip="Diagnose SPN 3364 FMI 2">Fault code</button><button data-rw8-chip="Build invoice for replaced water pump and belt">Invoice</button><button data-rw8-chip="Save repair memory for X15 overheating during regen">Memory</button><button data-route="vision">Photo</button></div>${(state.brainChats||[]).map(m=>m.kind==="card"?rw8RenderCard(m.meta):`<div class="rw8-msg ${m.role==="user"?"user":"ai"}"><b>${m.role==="user"?"You":"RW AI"}</b>${rw8Clean(m.text)}</div>`).join("")||`<div class="rw8-msg ai"><b>RW AI</b>Ask me anything. I’ll keep the chat clean and use cards/buttons when something needs saved or opened.</div>`}</div><div class="rw8-compose-wrap"><div class="rw8-compose"><button class="rw8-plus" id="rw8Plus">+</button><div class="rw8-inputbox"><input id="rw8Input" placeholder="Ask Rolling Wrench AI anything..." /><button class="rw8-mic" id="rw8Mic">🎙</button></div><button class="rw8-voice" id="rw8Voice">▮▮</button><button class="rw8-send" id="rw8Send">➤</button></div></div></section>`;bindPageTools();const sc=$("#rw8Thread");if(sc)sc.scrollTop=sc.scrollHeight;$("#rw8Send").onclick=()=>rw8Run($("#rw8Input").value);$("#rw8Input").onkeydown=e=>{if(e.key==="Enter")rw8Run($("#rw8Input").value);};$("#rw8Clear").onclick=()=>{state.brainChats=[];saveState();renderRW8Brain();};$("#rw8Close").onclick=()=>{document.body.classList.remove("rw-ai-mode");setRoute("home");};$("#rw8Plus").onclick=()=>setRoute("vision");$("#rw8Mic").onclick=()=>{if(typeof startVoiceToField==="function")startVoiceToField("rw8Input");else toast("Voice not available");};$("#rw8Voice").onclick=()=>{if(typeof startVoiceToField==="function")startVoiceToField("rw8Input");else toast("Voice mode coming next");};$$("[data-rw8-chip]").forEach(b=>b.onclick=()=>rw8Run(b.dataset.rw8Chip));$$("[data-rw8-action]").forEach(b=>b.onclick=()=>{const a=b.dataset.rw8Action,q=state.rw8.lastCard?.quote||(state.quotes||[])[0];if(a==="openQuote")setRoute("quotes");if(a==="findParts")setRoute("parts");if(a==="sendQuote")setRoute("sendquotes");if(a==="invoiceQuote"){if(q){state.invoices.unshift({customer:q.customer,truck:q.truck,work:q.desc,total:q.total,status:"Draft",fromQuote:true,date:new Date().toLocaleString()});saveState();}setRoute("invoices");}if(a==="saveMemory")setRoute("memorylibrary");if(a==="openFault")setRoute("fault");});}
+
+const routes = { ai:renderRW8Brain, brain:renderRW8Brain,  
   home:renderHome, clock:renderClock, truck:renderTruck,  parts:renderParts, fault:renderFault,
   repairhud:renderRepairHud, quotes:renderQuotes, invoices:renderInvoices, workorders:renderWorkOrders,
   schedule:renderSchedule, customers:renderCustomers, pindrop:renderPinDrop, camera:renderCamera, reports:renderReports,
@@ -3891,7 +3922,7 @@ function render(route=currentRoute()){
     }
     if(route && route.startsWith("quoteapproval-")){ renderQuoteApprovalPortal(route.replace("quoteapproval-","")); return; }
     if(route && route.startsWith("invoiceportal-")){ renderInvoicePortal(route.replace("invoiceportal-","")); return; }
-    if(route !== "brain" && route !== "ai"){ document.body.classList.remove("ai-full-open"); document.body.classList.remove("ai-lock"); }
+    if(route !== "brain" && route !== "ai"){ document.body.classList.remove("ai-full-open");document.body.classList.remove("rw-ai-mode"); document.body.classList.remove("ai-lock");document.body.classList.remove("rw-ai-mode"); }
     const fn=routes[route] || renderHome;
     fn();
     $$(".bottom-nav button").forEach(b=>b.classList.toggle("active", b.dataset.route===route || (route==="home" && b.dataset.route==="home")));
