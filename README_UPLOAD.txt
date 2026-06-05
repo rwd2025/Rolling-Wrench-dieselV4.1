@@ -211,3 +211,11 @@ V7.1 REAL AI BRAIN UPGRADE:
 - Warns when no active truck/customer is loaded.
 - Simplified action buttons.
 - Still supports backend AI endpoint if configured.
+
+V7.1a AI SCREEN + QUOTE FIX:
+- Forces every AI route/Ask AI entry point to open the ChatGPT-style full-screen AI.
+- Old AI screen with Save buttons is bypassed.
+- Fixes raw \n display in AI messages.
+- Build a clutch quote for a 2014 Peterbilt with an ISX now creates an exact clutch quote draft:
+  11.5 hrs, $135/hr, $250 service call, clutch parts list, disclaimer.
+- AI creates quote record automatically.

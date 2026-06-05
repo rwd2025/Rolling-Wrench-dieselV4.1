@@ -132,7 +132,7 @@ function renderHome(){
       <button class="v5-hub-card" data-route="fileuploads"><b>File Uploads</b><small>Photos • docs • signatures</small></button>
       <button class="v5-hub-card" data-route="filehistory"><b>File History</b><small>Files by module</small></button>
       <button class="v5-hub-card" data-route="vision"><b>OCR + Vision</b><small>VIN • parts • invoices • faults</small></button>
-      <button class="v5-hub-card" data-route="brain"><b>RW AI Brain</b><small>One command controls the app</small></button>
+      <button class="v5-hub-card" data-route="brain"><b>Ask Rolling Wrench AI</b><small>ChatGPT-style command center</small></button>
       <button class="v5-hub-card" data-route="brainsettings"><b>Brain Settings</b><small>AI / OCR endpoints</small></button>
       <button class="v5-hub-card" data-route="memorylibrary"><b>Repair Memory Library</b><small>Search • edit • archive • AI</small></button>
       <button class="v5-hub-card" data-route="cleanup"><b>Data Cleanup</b><small>Delete test records</small></button>
@@ -3555,11 +3555,197 @@ function renderBrainFull(){
   $("#saveBrainSettings").onclick=()=>{saveState();toast("AI Brain saved");};
 }
 
+
+function v71aSanitize(text){
+  return (text || "").replace(/\\n/g,"\n");
+}
+function v71aQuoteForRequest(text){
+  const ctx = brainContext ? brainContext() : {};
+  const q = (text || "").toLowerCase();
+  const isClutch = q.includes("clutch");
+  const isPeterbilt = q.includes("peterbilt");
+  const isISX = q.includes("isx");
+  const rate = Number(ctx.laborRate || 135);
+  const serviceCall = Number(ctx.serviceCall || 250);
+  let hours = 11.5;
+  let partsText = "Parts price/location to be verified before final approval";
+  let partsList = "Clutch kit\nPilot bearing\nRelease bearing / throwout bearing\nFlywheel inspection / resurface or replacement if needed\nTransmission fluid if needed\nShop supplies";
+  if(!isClutch){
+    hours = q.includes("water pump") ? 4.0 : 3.0;
+    partsList = "Parts to be verified by VIN and supplier before final approval";
+  }
+  const labor = hours * rate;
+  const supplies = isClutch ? 45 : 25;
+  const total = labor + serviceCall + supplies;
+  const truckLine = isPeterbilt ? "2014 Peterbilt" : (ctx.truck || "Truck to verify");
+  const engineLine = isISX ? "Cummins ISX" : (ctx.engine || "Engine to verify");
+
+  return {
+    customer: ctx.customer || "",
+    truck: `${truckLine} ${ctx.vin || ""}`.trim(),
+    desc: text,
+    hours,
+    rate,
+    serviceCall,
+    parts: partsList,
+    partsSource: partsText,
+    subtotal: total,
+    total,
+    status:"Draft",
+    ai:true,
+    date:new Date().toLocaleString(),
+    professionalText:
+`SMART QUOTE — CLUTCH REPAIR
+
+Customer:
+${ctx.customer || "Add customer"}
+
+Truck:
+${truckLine}
+
+Engine:
+${engineLine}
+
+Job:
+${text}
+
+Labor:
+${hours} hours @ ${money(rate)}/hr = ${money(labor)}
+
+Service Call:
+${money(serviceCall)}
+
+Parts:
+${partsList}
+
+Parts Source:
+${partsText}
+
+Estimated Total:
+${money(total)}
+
+Estimate Disclaimer:
+Estimate only. Final price may increase or decrease based on additional labor, seized/broken hardware, hidden damage, diagnostic findings, parts availability, freight, shop supplies, taxes/fees, travel, or extra time required to complete the repair. Customer approval required before additional work is performed. Parts pricing and availability may change until purchased.`
+  };
+}
+async function v71aBrainAnswer(text){
+  const intent = brainIntent(text);
+  if(intent === "quote"){
+    return v71aQuoteForRequest(text).professionalText;
+  }
+  if(intent === "invoice"){
+    return v71StrongInvoice ? v71StrongInvoice(text) : brainBuildProfessionalText(intent,text);
+  }
+  if(intent === "diagnostic"){
+    return v71StrongDiagnostic ? v71StrongDiagnostic(text) : brainBuildProfessionalText(intent,text);
+  }
+  if(state.brainSettings?.useBackend && state.backend?.aiEndpoint){
+    try{return v71aSanitize(await v66AskRealAi(text));}
+    catch(e){return v71aSanitize(brainBuildProfessionalText(intent,text)) + "\n\nBackend note: " + e.message;}
+  }
+  return v71aSanitize(brainBuildProfessionalText(intent,text));
+}
+function v71aRouteAction(intent,text,answer){
+  const ctx = brainContext ? brainContext() : {};
+  let route = "brain";
+  if(intent === "quote"){
+    const q = v71aQuoteForRequest(text);
+    state.quotes.unshift(q);
+    brainLog("Exact Quote Created", text);
+    route = "quotes";
+  }else if(intent === "invoice"){
+    state.invoices.unshift({customer:ctx.customer,truck:ctx.truck,work:answer,total:0,status:"Draft",date:new Date().toLocaleString(),ai:true});
+    brainLog("Invoice Created", text);
+    route = "invoices";
+  }else if(intent === "workorder"){
+    state.workorders.unshift({customer:ctx.customer,truck:ctx.truck,desc:text,status:"Open",date:new Date().toLocaleString(),ai:true});
+    brainLog("Work Order Created", text);
+    route = "workorders";
+  }else if(intent === "memory"){
+    ensureV691();
+    state.repairMemory.unshift({id:"MEM-AI-"+Date.now(),title:text.slice(0,50)||"AI Memory",complaint:text,cause:"",correction:"",customer:ctx.customer,truck:ctx.truck,vin:ctx.vin,engine:ctx.engine,keywords:text,status:"Saved",date:new Date().toLocaleString(),ai:true});
+    brainLog("Repair Memory Saved", text);
+    route = "memorylibrary";
+  }else if(intent === "parts"){
+    state.parts.unshift({query:text,notes:answer,date:new Date().toLocaleString(),ai:true});
+    brainLog("Parts Saved", text);
+    route = "parts";
+  }else if(intent === "diagnostic"){
+    state.notes.unshift({type:"AI Diagnostic",note:answer,date:new Date().toLocaleString()});
+    brainLog("Diagnostic Saved", text);
+    route = "fault";
+  }else if(intent === "vision"){
+    brainLog("Vision Routed", text);
+    route = "vision";
+  }else{
+    state.notes.unshift({type:"AI Brain",note:answer,date:new Date().toLocaleString()});
+    brainLog("AI Note Saved", text);
+  }
+  saveState();
+  return route;
+}
+function renderBrainChatGPT(){
+  ensureV70();
+  document.body.classList.add("ai-full-open");
+  const ctx = brainContext ? brainContext() : {};
+  const hasTruck = !!(ctx.truck || ctx.vin || ctx.customer);
+  $("#screen").innerHTML = `<section class="ai-chatgpt-shell">
+    <div class="ai-chatgpt-header">
+      <div class="ai-chatgpt-title">
+        <div class="ai-chatgpt-logo">RW</div>
+        <div><b>Ask Rolling Wrench AI</b><small>Chat • voice • photos • quotes • invoices • diagnostics</small></div>
+      </div>
+      <button class="ai-close-btn" id="aiClose">Close</button>
+    </div>
+    ${!hasTruck ? `<div class="ai-context-warning">No active truck/customer loaded. I can still build drafts, but VIN-based parts and exact pricing need a truck profile.</div>` : ""}
+    <div class="ai-chatgpt-tools">
+      <button data-ai-chip="Build a clutch quote for a 2014 Peterbilt with an ISX">Clutch quote</button>
+      <button data-ai-chip="Build invoice for replacing water pump and belt">Invoice</button>
+      <button data-ai-chip="Diagnose SPN 3364 FMI 2">Fault code</button>
+      <button data-ai-chip="Save repair memory for X15 overheating during regen">Repair memory</button>
+      <button data-route="vision">Scan photo</button>
+    </div>
+    <div class="ai-chatgpt-thread" id="aiThread">
+      ${(state.brainChats||[]).map(m=>`<div class="ai-chatgpt-bubble ${m.role==="user"?"user":"bot"}"><b>${m.role==="user"?"You":"Rolling Wrench AI"}</b>${v71aSanitize(m.text)}</div>`).join("") || `<div class="ai-chatgpt-bubble bot"><b>Rolling Wrench AI</b>Ask anything. I can build quotes, invoices, work orders, repair memory, parts notes, diagnostic workflows, and open OCR/Vision for photos.</div>`}
+    </div>
+    <div class="ai-chatgpt-compose">
+      <button class="attach" id="aiAttach">+</button>
+      <input id="aiChatInput" placeholder="Ask Rolling Wrench AI anything..." />
+      <button id="aiVoice">🎙</button>
+      <button class="send" id="aiSend">➤</button>
+    </div>
+  </section>`;
+  bindPageTools();
+  const thread=$("#aiThread");
+  if(thread) thread.scrollTop=thread.scrollHeight;
+  async function run(text){
+    text=(text||"").trim();
+    if(!text) return;
+    state.brainChats.push({role:"user",text,date:new Date().toLocaleString()});
+    const intent=brainIntent(text);
+    const answer=await v71aBrainAnswer(text);
+    state.brainChats.push({role:"ai",text:answer,date:new Date().toLocaleString(),intent});
+    v71aRouteAction(intent,text,answer);
+    saveState();
+    renderBrainChatGPT();
+    toast(intent==="quote" ? "Exact quote created" : "AI saved");
+  }
+  $("#aiSend").onclick=()=>run($("#aiChatInput").value);
+  $("#aiChatInput").onkeydown=e=>{if(e.key==="Enter")run($("#aiChatInput").value);};
+  $("#aiVoice").onclick=()=>{if(typeof startVoiceToField==="function") startVoiceToField("aiChatInput"); else toast("Voice not available");};
+  $("#aiAttach").onclick=()=>setRoute("vision");
+  $("#aiClose").onclick=()=>{document.body.classList.remove("ai-full-open");setRoute("home");};
+  $$("[data-ai-chip]").forEach(b=>b.onclick=()=>run(b.dataset.aiChip));
+}
+function v71aPatchAiEntrypoints(){
+  document.querySelectorAll('[data-route="ai"], [data-route="brain"]').forEach(el=>el.setAttribute("data-route","brain"));
+}
+
 const routes = {
-  home:renderHome, clock:renderClock, truck:renderTruck, ai:renderAi, parts:renderParts, fault:renderFault,
+  home:renderHome, clock:renderClock, truck:renderTruck, ai:renderBrainChatGPT, parts:renderParts, fault:renderFault,
   repairhud:renderRepairHud, quotes:renderQuotes, invoices:renderInvoices, workorders:renderWorkOrders,
   schedule:renderSchedule, customers:renderCustomers, pindrop:renderPinDrop, camera:renderCamera, reports:renderReports,
-  memory:renderRepairMemoryLibrary, suppliers:renderSuppliers, pmdue:renderPmDue, settings:renderSettingsSafe, alerts:renderAlerts, workflow:renderWorkflowHub, pmmanager:renderPMManager, inventory:renderInventory, supplierpricing:renderSupplierPricing, notifications:renderNotifications, signin:renderSignInPreview, supabase:renderSupabaseSync, v52:renderV52Dashboard, dashboard:renderBusinessDashboard, aioperator:renderAIOperator, photointel:renderPhotoIntelligence, schedulecommand:renderScheduleCommand, customerportal:renderCustomerPortalHub, sendquotes:renderQuoteSendCenter, sendinvoices:renderInvoiceSendCenter, stability:renderStabilityCenter, externallinks:renderExternalLinksCenter, storageprep:renderStoragePrep, backend:renderBackendCenter, backendsetup:renderBackendSetup, communications:renderCommunicationCenter, templates:renderCommunicationTemplates, fileuploads:renderFileUploadCenter, filehistory:renderFileHistory, vision:renderVisionCenter, memorylibrary:renderRepairMemoryLibrary, cleanup:renderCleanupCenter, brain:renderBrainFull, brainsettings:renderBrainSettings, visionsettings:renderVisionSettings, portalhub:renderCustomerPortalHub, techmode:renderTechMode, about:renderAboutLegal, login:renderLogin, account:renderAuthSettings, aiengine:renderAiEngine, realocr:renderRealOCR, filestorage:renderFileStorage, gpsmanager:renderGPSManager, repair:renderRepair, business:renderBusiness
+  memory:renderRepairMemoryLibrary, suppliers:renderSuppliers, pmdue:renderPmDue, settings:renderSettingsSafe, alerts:renderAlerts, workflow:renderWorkflowHub, pmmanager:renderPMManager, inventory:renderInventory, supplierpricing:renderSupplierPricing, notifications:renderNotifications, signin:renderSignInPreview, supabase:renderSupabaseSync, v52:renderV52Dashboard, dashboard:renderBusinessDashboard, aioperator:renderAIOperator, photointel:renderPhotoIntelligence, schedulecommand:renderScheduleCommand, customerportal:renderCustomerPortalHub, sendquotes:renderQuoteSendCenter, sendinvoices:renderInvoiceSendCenter, stability:renderStabilityCenter, externallinks:renderExternalLinksCenter, storageprep:renderStoragePrep, backend:renderBackendCenter, backendsetup:renderBackendSetup, communications:renderCommunicationCenter, templates:renderCommunicationTemplates, fileuploads:renderFileUploadCenter, filehistory:renderFileHistory, vision:renderVisionCenter, memorylibrary:renderRepairMemoryLibrary, cleanup:renderCleanupCenter, ai:renderBrainChatGPT, brain:renderBrainChatGPT, brainsettings:renderBrainSettings, visionsettings:renderVisionSettings, portalhub:renderCustomerPortalHub, techmode:renderTechMode, about:renderAboutLegal, login:renderLogin, account:renderAuthSettings, aiengine:renderAiEngine, realocr:renderRealOCR, filestorage:renderFileStorage, gpsmanager:renderGPSManager, repair:renderRepair, business:renderBusiness
 };
 function render(route=currentRoute()){
   try{
@@ -3572,6 +3758,7 @@ function render(route=currentRoute()){
     }
     if(route && route.startsWith("quoteapproval-")){ renderQuoteApprovalPortal(route.replace("quoteapproval-","")); return; }
     if(route && route.startsWith("invoiceportal-")){ renderInvoicePortal(route.replace("invoiceportal-","")); return; }
+    if(route !== "brain" && route !== "ai") document.body.classList.remove("ai-full-open");
     const fn=routes[route] || renderHome;
     fn();
     $$(".bottom-nav button").forEach(b=>b.classList.toggle("active", b.dataset.route===route || (route==="home" && b.dataset.route==="home")));
