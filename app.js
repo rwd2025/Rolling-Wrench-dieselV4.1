@@ -131,6 +131,8 @@ function renderHome(){
       <button class="v5-hub-card" data-route="templates"><b>Message Templates</b><small>Default text messages</small></button>
       <button class="v5-hub-card" data-route="fileuploads"><b>File Uploads</b><small>Photos • docs • signatures</small></button>
       <button class="v5-hub-card" data-route="filehistory"><b>File History</b><small>Files by module</small></button>
+      <button class="v5-hub-card" data-route="vision"><b>OCR + Vision</b><small>VIN • parts • invoices • faults</small></button>
+      <button class="v5-hub-card" data-route="visionsettings"><b>Vision Settings</b><small>OCR / AI endpoints</small></button>
       <button class="v5-hub-card" data-route="account"><b>Account / Roles</b><small>Login • users • permissions</small></button>
       <button class="v5-hub-card" data-route="dashboard"><b>Business Dashboard</b><small>Revenue • quotes • invoices • jobs</small></button>
       <button class="v5-hub-card" data-route="aioperator"><b>AI Operator</b><small>Ask AI to build anything</small></button>
@@ -2825,11 +2827,143 @@ function renderFileHistory(){
   bindPageTools();
 }
 
+
+function ensureV69(){
+  if(typeof ensureV68 === "function") ensureV68();
+  if(!state.visionScans) state.visionScans = [];
+  if(!state.visionSettings) state.visionSettings = {autoSave:true, requireReview:true, exactPartsOnly:true};
+}
+function visionIcon(type){
+  const t=(type||"").toLowerCase();
+  if(t.includes("vin")) return "VIN";
+  if(t.includes("part")) return "📦";
+  if(t.includes("invoice")) return "🧾";
+  if(t.includes("fault")) return "⚠";
+  if(t.includes("damage")) return "💥";
+  return "👁";
+}
+function localVisionExtract(type,fileName,notes){
+  const t=(type||"").toLowerCase();
+  const base={type,fileName:fileName||"camera image",notes:notes||"",confidence:"Local workflow",created:new Date().toLocaleString(),fields:{}};
+  if(t.includes("vin")){
+    base.summary="VIN plate scan ready for manual verification. Real OCR endpoint can extract VIN/year/make/model/engine when connected.";
+    base.fields={vin:"VERIFY MANUALLY", unit:state.truck.unit||"", customer:state.truck.customer||"", engine:state.truck.engine||""};
+  }else if(t.includes("part")){
+    base.summary="Part label scan ready. Exact part number must be verified by VIN/OEM/supplier before quoting.";
+    base.fields={partNumber:"UNKNOWN", brand:"UNKNOWN", description:"Part label / box", exactPart:"VERIFY"};
+  }else if(t.includes("invoice")){
+    base.summary="Invoice/receipt scan ready. Vendor, line items, totals require review before saving.";
+    base.fields={vendor:"UNKNOWN", invoiceNumber:"UNKNOWN", total:"0.00", date:"UNKNOWN"};
+  }else if(t.includes("fault")){
+    base.summary="Fault screen scan ready. SPN/FMI/code text requires review before diagnosis.";
+    base.fields={code:"UNKNOWN", module:"UNKNOWN", status:"UNKNOWN", action:"Open Fault Doctor"};
+  }else if(t.includes("damage")){
+    base.summary="Damage photo recorded for work order, quote, or invoice documentation.";
+    base.fields={area:"UNKNOWN", severity:"Review", repairNeeded:"Inspect"};
+  }else{
+    base.summary="Document/photo classified and ready to save to repair memory.";
+    base.fields={classification:type, action:"Review"};
+  }
+  return base;
+}
+async function v69RunVision(type,file,notes){
+  ensureV69();
+  if(state.backend && state.backend.ocrEndpoint){
+    try{
+      const payload={type,fileName:file?.name||"",notes,context:{truck:state.truck,customer:state.truck.customer}};
+      const data=await v66RunRealOcr(payload);
+      const rec={type,fileName:file?.name||"camera image",notes,summary:data.text||data.summary||JSON.stringify(data),fields:data.fields||{},confidence:data.confidence||"backend",created:new Date().toLocaleString()};
+      state.visionScans.unshift(rec);
+      saveState();
+      return rec;
+    }catch(e){
+      const rec=localVisionExtract(type,file?.name,notes);
+      rec.summary+="\n\nBackend OCR failed: "+e.message;
+      state.visionScans.unshift(rec); saveState(); return rec;
+    }
+  }
+  const rec=localVisionExtract(type,file?.name,notes);
+  state.visionScans.unshift(rec);
+  saveState();
+  return rec;
+}
+function v69SaveScanToModule(scan,target){
+  const text=`Vision Scan: ${scan.type}\nFile: ${scan.fileName}\n${scan.summary}\nFields: ${JSON.stringify(scan.fields,null,2)}`;
+  if(target==="truck"){
+    if(scan.fields?.vin && scan.fields.vin!=="VERIFY MANUALLY") state.truck.vin=scan.fields.vin;
+    addTruckHistory("Vision/OCR",text);
+  }
+  if(target==="parts") state.parts.push({query:scan.fields?.partNumber || scan.fileName, notes:text});
+  if(target==="invoice") state.invoices.push({customer:state.truck.customer,truck:state.truck.unit,work:text,total:Number(scan.fields?.total||0),date:new Date().toLocaleString()});
+  if(target==="quote") state.quotes.push({customer:state.truck.customer,truck:state.truck.unit,desc:text,total:0,date:new Date().toLocaleString()});
+  if(target==="workorder") state.workorders.push({customer:state.truck.customer,truck:state.truck.unit,desc:text,status:"Vision Scan",date:new Date().toLocaleString()});
+  if(target==="fault") state.notes.push({type:"Fault Screen OCR",note:text,date:new Date().toLocaleString()});
+  if(target==="memory") state.notes.push({type:"Vision Scan",note:text,date:new Date().toLocaleString()});
+  saveState();
+}
+function renderVisionCenter(){
+  ensureV69();
+  $("#screen").innerHTML=`${pageHead("OCR + Vision","saveVisionSettings")}
+  <section class="vision-card"><b>Real OCR + Vision Workflow</b><small>Scan VIN plates, part labels, invoices, fault screens, damage photos, and documents. Backend OCR endpoint hooks are ready.</small></section>
+  <section class="form-panel form-grid">
+    <label>Scan Type<select id="visionType"><option>VIN Plate</option><option>Part Label / Box</option><option>Invoice / Receipt</option><option>Fault Screen / Scanner</option><option>Damage Photo</option><option>Repair Photo</option><option>Document</option></select></label>
+    <label>Save To<select id="visionTarget"><option value="truck">Truck History</option><option value="parts">Parts Lookup</option><option value="workorder">Work Order</option><option value="quote">Quote</option><option value="invoice">Invoice</option><option value="fault">Fault Doctor</option><option value="memory">Repair Memory</option></select></label>
+    <input id="visionFile" type="file" accept="image/*,.pdf" capture="environment">
+    <label>Notes<textarea id="visionNotes" placeholder="What are we looking at?"></textarea></label>
+    <div class="vision-grid">
+      <button class="vision-action" id="runVision"><b>Run OCR/Vision</b><small>Extract fields</small></button>
+      <button class="vision-action" id="saveVisionToModule"><b>Save To Module</b><small>Use extracted data</small></button>
+      <button class="vision-action" data-route="backend"><b>Backend Settings</b><small>OCR endpoint</small></button>
+      <button class="vision-action" data-route="fileuploads"><b>File Uploads</b><small>Attach original file</small></button>
+    </div>
+    <div class="vision-result" id="visionResult">No scan yet.</div>
+    <div class="extracted-fields" id="visionFields"></div>
+  </section>
+  <section class="settings-section">
+    <h3>Vision History</h3>
+    ${(state.visionScans||[]).length ? state.visionScans.map((s,i)=>`<div class="vision-history-card"><div class="vision-icon">${visionIcon(s.type)}</div><div><b>${s.type}</b><small>${s.created}<br>${s.summary}</small></div><button class="action-btn" data-load-vision="${i}">Open</button></div>`).join("") : `<div class="output">No OCR/Vision scans yet.</div>`}
+  </section>`;
+  bindPageTools();
+  let activeScan=null;
+  function showScan(scan){
+    activeScan=scan;
+    $("#visionResult").textContent=`${scan.summary}\n\nConfidence: ${scan.confidence}\nFile: ${scan.fileName}`;
+    $("#visionFields").innerHTML=Object.entries(scan.fields||{}).map(([k,v])=>`<div class="extracted-field"><b>${k}</b><span>${v}</span></div>`).join("") || `<div class="output">No fields extracted.</div>`;
+  }
+  $("#runVision").onclick=async()=>{
+    const file=$("#visionFile").files[0];
+    $("#visionResult").textContent="Scanning...";
+    const scan=await v69RunVision($("#visionType").value,file,$("#visionNotes").value);
+    if(file && typeof v68MakeFileRecord==="function"){
+      let dataUrl="";
+      if(file.type && file.type.startsWith("image/")) dataUrl=await v68ReadFileAsDataUrl(file);
+      v68MakeFileRecord(file,$("#visionTarget").value,$("#visionType").value,$("#visionNotes").value,dataUrl);
+    }
+    showScan(scan);
+    toast("Vision scan complete");
+  };
+  $("#saveVisionToModule").onclick=()=>{if(!activeScan){toast("Run scan first");return;}v69SaveScanToModule(activeScan,$("#visionTarget").value);toast("Saved to module");};
+  $$("[data-load-vision]").forEach(btn=>btn.onclick=()=>showScan(state.visionScans[Number(btn.dataset.loadVision)]));
+  $("#saveVisionSettings").onclick=()=>{saveState();toast("Vision settings saved");};
+}
+function renderVisionSettings(){
+  ensureV69();
+  $("#screen").innerHTML=`${pageHead("Vision Settings","saveVisionSettings2")}
+  <section class="form-panel form-grid">
+    <label>OCR Endpoint<input id="visionOcrEndpoint" value="${state.backend?.ocrEndpoint||""}" placeholder="https://your-ocr-backend"></label>
+    <label>OCR Key<input id="visionOcrKey" value="${state.backend?.ocrKey||""}"></label>
+    <label>AI Vision Endpoint<input id="visionAiEndpoint" value="${state.backend?.aiEndpoint||""}" placeholder="https://your-ai-vision-backend"></label>
+    <div class="output">Local workflow works without endpoint. Real extraction needs OCR/vision backend connected.</div>
+  </section>`;
+  bindPageTools();
+  $("#saveVisionSettings2").onclick=()=>{state.backend=state.backend||{};state.backend.ocrEndpoint=$("#visionOcrEndpoint").value;state.backend.ocrKey=$("#visionOcrKey").value;state.backend.aiEndpoint=$("#visionAiEndpoint").value;saveState();toast("Vision settings saved");};
+}
+
 const routes = {
   home:renderHome, clock:renderClock, truck:renderTruck, ai:renderAi, parts:renderParts, fault:renderFault,
   repairhud:renderRepairHud, quotes:renderQuotes, invoices:renderInvoices, workorders:renderWorkOrders,
   schedule:renderSchedule, customers:renderCustomers, pindrop:renderPinDrop, camera:renderCamera, reports:renderReports,
-  memory:renderMemory, suppliers:renderSuppliers, pmdue:renderPmDue, settings:renderSettingsSafe, alerts:renderAlerts, workflow:renderWorkflowHub, pmmanager:renderPMManager, inventory:renderInventory, supplierpricing:renderSupplierPricing, notifications:renderNotifications, signin:renderSignInPreview, supabase:renderSupabaseSync, v52:renderV52Dashboard, dashboard:renderBusinessDashboard, aioperator:renderAIOperator, photointel:renderPhotoIntelligence, schedulecommand:renderScheduleCommand, customerportal:renderCustomerPortalHub, sendquotes:renderQuoteSendCenter, sendinvoices:renderInvoiceSendCenter, stability:renderStabilityCenter, externallinks:renderExternalLinksCenter, storageprep:renderStoragePrep, backend:renderBackendCenter, backendsetup:renderBackendSetup, communications:renderCommunicationCenter, templates:renderCommunicationTemplates, fileuploads:renderFileUploadCenter, filehistory:renderFileHistory, portalhub:renderCustomerPortalHub, techmode:renderTechMode, about:renderAboutLegal, login:renderLogin, account:renderAuthSettings, aiengine:renderAiEngine, realocr:renderRealOCR, filestorage:renderFileStorage, gpsmanager:renderGPSManager, repair:renderRepair, business:renderBusiness
+  memory:renderMemory, suppliers:renderSuppliers, pmdue:renderPmDue, settings:renderSettingsSafe, alerts:renderAlerts, workflow:renderWorkflowHub, pmmanager:renderPMManager, inventory:renderInventory, supplierpricing:renderSupplierPricing, notifications:renderNotifications, signin:renderSignInPreview, supabase:renderSupabaseSync, v52:renderV52Dashboard, dashboard:renderBusinessDashboard, aioperator:renderAIOperator, photointel:renderPhotoIntelligence, schedulecommand:renderScheduleCommand, customerportal:renderCustomerPortalHub, sendquotes:renderQuoteSendCenter, sendinvoices:renderInvoiceSendCenter, stability:renderStabilityCenter, externallinks:renderExternalLinksCenter, storageprep:renderStoragePrep, backend:renderBackendCenter, backendsetup:renderBackendSetup, communications:renderCommunicationCenter, templates:renderCommunicationTemplates, fileuploads:renderFileUploadCenter, filehistory:renderFileHistory, vision:renderVisionCenter, visionsettings:renderVisionSettings, portalhub:renderCustomerPortalHub, techmode:renderTechMode, about:renderAboutLegal, login:renderLogin, account:renderAuthSettings, aiengine:renderAiEngine, realocr:renderRealOCR, filestorage:renderFileStorage, gpsmanager:renderGPSManager, repair:renderRepair, business:renderBusiness
 };
 function render(route=currentRoute()){
   try{

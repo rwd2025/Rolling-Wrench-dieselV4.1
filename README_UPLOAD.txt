@@ -169,3 +169,13 @@ V6.8 REAL FILE UPLOADS:
 - Supabase file_records sync prep.
 - File History screen grouped by module.
 NOTE: Browser local files are recorded/previewed. True cloud uploads require Supabase Storage bucket policies or an upload backend.
+
+V6.9 OCR + VISION:
+- OCR + Vision center.
+- Scan VIN plates, part boxes/labels, invoices/receipts, fault screens, damage photos, repair photos, documents.
+- Extracted field display.
+- Save extracted results to Truck, Parts, Work Order, Quote, Invoice, Fault Doctor, Repair Memory.
+- Vision history.
+- Original file can be saved to File Uploads workflow.
+- OCR/AI Vision endpoint settings.
+NOTE: Local extraction is placeholder/smart workflow. Real OCR/vision requires backend endpoint with AI/OCR service.
