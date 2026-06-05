@@ -236,3 +236,11 @@ V7.2a AI CLEAR + SEND-TO-QUOTES FIX:
 - Added hard guard so "send to quotes" cannot be interpreted as a new job.
 
 V8.0 RW AI BRAIN: ChatGPT/Gemini-style assistant, clean cards, persistent truck/engine context, quote/invoice/memory/diagnostic routing, clear chat, fixed bottom input.
+
+V8.1 AI CHAT BOX FIX:
+- Fixed iPhone chat box cutoff.
+- Send button no longer clips off right side.
+- Removed always-on pause/voice button from normal chat layout.
+- Input bar uses safe-area width and minmax sizing.
+- Keyboard focus auto-scrolls newest messages/input.
+- Added fallback CSS for older V7.2 AI bar if browser cache still shows it.
