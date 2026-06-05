@@ -124,3 +124,5 @@ V6.0 PRODUCTION BUILD:
 - Workflow automation hooks across customer/truck/work order/quote/invoice.
 - Existing V5.2b settings fix retained.
 NOTE: This is frontend/platform ready. Live AI/OCR/payment/customer portal public links still require backend/API deployment.
+
+V6.1 CLOCK FIX: Rebuilt clock to use stored start timestamps, pause/stop base seconds, and live elapsed time. Start no longer resets/recalculates wrong.

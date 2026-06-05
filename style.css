@@ -767,3 +767,9 @@ body.high-contrast{--line:#ffffff;--muted:#e9eef5}
 @media(max-width:520px){
   .v6-action-grid{grid-template-columns:1fr}
 }
+
+.clock-running-badge{display:inline-flex;align-items:center;gap:6px;color:var(--green);font-weight:900;text-transform:uppercase;font-size:12px}
+.clock-running-badge:before{content:"";width:9px;height:9px;border-radius:50%;background:var(--green);box-shadow:0 0 12px var(--green)}
+.clock-paused-badge{color:#f2b84b;font-weight:900;text-transform:uppercase;font-size:12px}
+.clock-stopped-badge{color:var(--muted);font-weight:900;text-transform:uppercase;font-size:12px}
+.clock-fixed-note{border:1px solid rgba(57,168,255,.45);background:#071018;border-radius:14px;padding:10px;color:#dcecff;margin-bottom:10px}

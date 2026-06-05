@@ -16,7 +16,7 @@ let state = JSON.parse(localStorage.getItem("RWD_V41_STATE") || JSON.stringify(d
 function saveState(){ localStorage.setItem("RWD_V41_STATE", JSON.stringify(state)); }
 function toast(msg){ const t=$("#toast"); if(!t)return; t.textContent=msg; t.classList.add("show"); clearTimeout(window.__t); window.__t=setTimeout(()=>t.classList.remove("show"),1300); }
 function formatTime(sec){ sec=Math.max(0,Math.floor(sec||0)); const h=String(Math.floor(sec/3600)).padStart(2,"0"), m=String(Math.floor(sec%3600/60)).padStart(2,"0"), s=String(sec%60).padStart(2,"0"); return `${h}:${m}:${s}`; }
-function totalSeconds(){ return Object.values(state.jobs).reduce((a,j)=>a+Number(j.seconds||0),0); }
+function totalSeconds(){ return totalContinuousSeconds(); }
 function clockDollars(sec){ return (Number(sec||0)/3600) * Number(state.settings.laborRate||135); }
 function totalInvoiceMoney(){ return state.invoices.reduce((a,i)=>a+Number(i.total||0),0); }
 function homeEarnings(){ return totalInvoiceMoney() + clockDollars(totalSeconds()); }
@@ -149,33 +149,122 @@ function recentRows(){
   return recent.map(x=>`<div class="job-row"><b>${x.type}</b><div><b>${x.customer || "Customer"}</b><small>${x.desc || x.work || x.job || "Saved item"}</small></div><span class="badge">SAVED</span></div>`).join("");
 }
 
+
+function normalizeClockJobs(){
+  if(!state.jobs) state.jobs = {};
+  ["job1","job2","job3"].forEach((id,idx)=>{
+    const old = state.jobs[id] || {};
+    const already = Number(old.seconds || old.elapsedSeconds || old.baseSeconds || 0);
+    old.baseSeconds = Number(old.baseSeconds ?? already);
+    old.startTimestamp = old.startTimestamp || null;
+    old.running = !!old.running;
+    old.name = old.name || `Job ${idx+1}`;
+    old.customer = old.customer || "";
+    old.status = old.status || (old.running ? "RUNNING" : "READY");
+    old.saved = old.saved || [];
+    state.jobs[id]=old;
+  });
+}
+function currentJobSeconds(job){
+  if(!job) return 0;
+  const base = Number(job.baseSeconds || 0);
+  if(job.running && job.startTimestamp){
+    return base + Math.max(0, Math.floor((Date.now() - Number(job.startTimestamp)) / 1000));
+  }
+  return base;
+}
+function totalContinuousSeconds(){
+  normalizeClockJobs();
+  return Object.values(state.jobs).reduce((a,j)=>a+currentJobSeconds(j),0);
+}
+function startContinuousJob(id){
+  normalizeClockJobs();
+  const j=state.jobs[id];
+  updateJobInputs(id);
+  if(!j.running){
+    j.baseSeconds = currentJobSeconds(j);
+    j.startTimestamp = Date.now();
+    j.running = true;
+    j.status = "RUNNING";
+  }
+  saveState();
+}
+function pauseContinuousJob(id){
+  normalizeClockJobs();
+  const j=state.jobs[id];
+  updateJobInputs(id);
+  j.baseSeconds = currentJobSeconds(j);
+  j.startTimestamp = null;
+  j.running = false;
+  j.status = "PAUSED";
+  saveState();
+}
+function stopContinuousJob(id){
+  normalizeClockJobs();
+  const j=state.jobs[id];
+  updateJobInputs(id);
+  j.baseSeconds = currentJobSeconds(j);
+  j.startTimestamp = null;
+  j.running = false;
+  j.status = "STOPPED";
+  saveState();
+}
+function clearContinuousJob(id){
+  normalizeClockJobs();
+  const j=state.jobs[id];
+  j.baseSeconds = 0;
+  j.seconds = 0;
+  j.startTimestamp = null;
+  j.running = false;
+  j.status = "READY";
+  saveState();
+}
+function saveContinuousClock(id, show=true){
+  normalizeClockJobs();
+  updateJobInputs(id);
+  const j=state.jobs[id];
+  const seconds=currentJobSeconds(j);
+  j.baseSeconds=seconds;
+  j.saved.push({name:j.name,customer:j.customer,seconds,labor:clockDollars(seconds),date:new Date().toLocaleString()});
+  j.status=j.running ? "RUNNING/SAVED" : "SAVED";
+  saveState();
+  if(show) toast(`${j.name} saved`);
+}
+function clockStatusHtml(j){
+  if(j.running) return `<span class="clock-running-badge">Running</span>`;
+  if(j.status==="PAUSED") return `<span class="clock-paused-badge">Paused</span>`;
+  return `<span class="clock-stopped-badge">${j.status || "Ready"}</span>`;
+}
+
 function renderClock(){
-  ensureV46();
+  normalizeClockJobs();
   $("#screen").innerHTML = `${pageHead("3 Job Time Clock","saveAllClock",false)}
+    <section class="clock-fixed-note">Clock uses stored start time now. It keeps correct elapsed time while switching screens, refreshing, or coming back later.</section>
     <section class="summary-card">
-      <div><span>Total Time</span><b id="clockTotalTime">${formatTime(totalSeconds())}</b></div>
-      <div><span>Total Labor</span><b id="clockTotalMoney">${money(clockDollars(totalSeconds()))}</b></div>
+      <div><span>Total Time</span><b id="clockTotalTime">${formatTime(totalContinuousSeconds())}</b></div>
+      <div><span>Total Labor</span><b id="clockTotalMoney">${money(clockDollars(totalContinuousSeconds()))}</b></div>
       <div><span>Rate</span><b>${money(state.settings.laborRate)}/hr</b></div>
     </section>
-    <section class="backend-banner"><b>Invoice Ready Clock</b><small>Each job can be saved, cleared, and pushed into Work Orders / Invoices / Reports.</small></section>
+    <section class="backend-banner"><b>Invoice Ready Clock</b><small>Each job runs independently and sends hours to Work Orders / Invoices / Reports.</small></section>
     <section class="clock-page-grid">
       ${Object.entries(state.jobs).map(([id,j])=>jobClockCard(id,j)).join("")}
     </section>`;
   bindPageTools();
-  $("#saveAllClock").onclick=()=>{ Object.entries(state.jobs).forEach(([id,j])=>saveClock(id,false)); saveState(); toast("All clocks saved"); renderClock(); };
+  $("#saveAllClock").onclick=()=>{ Object.keys(state.jobs).forEach(id=>saveContinuousClock(id,false)); saveState(); toast("All clocks saved"); renderClock(); };
 }
 
 function jobClockCard(id,j){
+  const seconds = currentJobSeconds(j);
   return `<article class="job-clock-card">
-    <div class="job-head"><h3>${j.name || id.toUpperCase()}</h3><span class="badge">${j.running ? "RUNNING" : (j.status || "READY")}</span></div>
+    <div class="job-head"><h3>${j.name || id.toUpperCase()}</h3>${clockStatusHtml(j)}</div>
     <div class="two-col">
       <label>Job Name<input id="${id}_name" value="${j.name || ""}"></label>
       <label>Customer<input id="${id}_customer" value="${j.customer || ""}"></label>
     </div>
-    <div class="job-time" id="${id}_time">${formatTime(j.seconds)}</div>
-    <div class="job-money" id="${id}_money">${money(clockDollars(j.seconds))}</div>
+    <div class="job-time" id="${id}_time">${formatTime(seconds)}</div>
+    <div class="job-money" id="${id}_money">${money(clockDollars(seconds))}</div>
     <div class="job-controls">
-      <button class="start" data-clock="start" data-job="${id}">Start</button>
+      <button class="start" data-clock="start" data-job="${id}">${j.running ? "Running" : "Start"}</button>
       <button class="pause" data-clock="pause" data-job="${id}">Pause</button>
       <button class="stop" data-clock="stop" data-job="${id}">Stop</button>
       <button data-clock="save" data-job="${id}">Save</button>
@@ -187,6 +276,7 @@ function jobClockCard(id,j){
     </div>
   </article>`;
 }
+
 function updateJobInputs(id){
   const j=state.jobs[id];
   const name=document.getElementById(`${id}_name`);
@@ -197,7 +287,7 @@ function updateJobInputs(id){
 function saveClock(id, show=true){
   updateJobInputs(id);
   const j=state.jobs[id];
-  j.saved.push({name:j.name,customer:j.customer,seconds:j.seconds,labor:clockDollars(j.seconds),date:new Date().toLocaleString()});
+  j.saved.push({name:j.name,customer:j.customer,seconds:j.seconds,labor:clockDollars(currentJobSeconds(j)),date:new Date().toLocaleString()});
   j.status="SAVED";
   saveState();
   if(show) toast(`${j.name} saved`);
@@ -1746,6 +1836,11 @@ Generated by Rolling Wrench Diesel LLC.</div>
   bindPageTools();
 }
 
+
+function saveClock(id, show=true){
+  return saveContinuousClock(id, show);
+}
+
 const routes = {
   home:renderHome, clock:renderClock, truck:renderTruck, ai:renderAi, parts:renderParts, fault:renderFault,
   repairhud:renderRepairHud, quotes:renderQuotes, invoices:renderInvoices, workorders:renderWorkOrders,
@@ -1772,19 +1867,19 @@ document.addEventListener("click", e=>{
   if(c){
     const id=c.dataset.job, action=c.dataset.clock, j=state.jobs[id];
     updateJobInputs(id);
-    if(action==="start"){ j.running=true; j.status="RUNNING"; }
-    if(action==="pause"){ j.running=false; j.status="PAUSED"; }
-    if(action==="stop"){ j.running=false; j.status="STOPPED"; }
-    if(action==="clear"){ j.running=false; j.seconds=0; j.status="READY"; }
-    if(action==="save"){ saveClock(id); }
+    if(action==="start"){ startContinuousJob(id); }
+    if(action==="pause"){ pauseContinuousJob(id); }
+    if(action==="stop"){ stopContinuousJob(id); }
+    if(action==="clear"){ clearContinuousJob(id); }
+    if(action==="save"){ saveContinuousClock(id); }
     if(action==="toWO"){ 
-      state.workorders.push({customer:j.customer || state.truck.customer, truck:state.truck.unit, desc:`${j.name} - clock labor ${formatTime(j.seconds)}`, status:"Open", clockSeconds:j.seconds, date:new Date().toLocaleString()});
-      addTruckHistory("Clock to Work Order", `${j.name} ${formatTime(j.seconds)}`);
+      state.workorders.push({customer:j.customer || state.truck.customer, truck:state.truck.unit, desc:`${j.name} - clock labor ${formatTime(currentJobSeconds(j))}`, status:"Open", clockSeconds:currentJobSeconds(j), date:new Date().toLocaleString()});
+      addTruckHistory("Clock to Work Order", `${j.name} ${formatTime(currentJobSeconds(j))}`);
       toast("Clock sent to work order");
     }
     if(action==="toInvoice"){
-      state.invoices.push({customer:j.customer || state.truck.customer, truck:state.truck.unit, work:`${j.name} - labor time ${formatTime(j.seconds)}`, total:clockDollars(j.seconds), clockSeconds:j.seconds, date:new Date().toLocaleString()});
-      addTruckHistory("Clock to Invoice", `${j.name} ${formatTime(j.seconds)} ${money(clockDollars(j.seconds))}`);
+      state.invoices.push({customer:j.customer || state.truck.customer, truck:state.truck.unit, work:`${j.name} - labor time ${formatTime(currentJobSeconds(j))}`, total:clockDollars(currentJobSeconds(j)), clockSeconds:currentJobSeconds(j), date:new Date().toLocaleString()});
+      addTruckHistory("Clock to Invoice", `${j.name} ${formatTime(currentJobSeconds(j))} ${money(clockDollars(currentJobSeconds(j)))}`);
       toast("Clock sent to invoice");
     }
     saveState(); renderClock(); return;
@@ -1793,7 +1888,7 @@ document.addEventListener("click", e=>{
 window.addEventListener("hashchange",()=>render());
 setInterval(()=>{
   let changed=false;
-  Object.values(state.jobs).forEach(j=>{ if(j.running){ j.seconds++; changed=true; }});
+  changed = Object.values(state.jobs).some(j=>j.running);
   if(changed){
     saveState();
     if(currentRoute()==="home" || currentRoute()==="clock") ensureV46();
