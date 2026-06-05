@@ -773,3 +773,15 @@ body.high-contrast{--line:#ffffff;--muted:#e9eef5}
 .clock-paused-badge{color:#f2b84b;font-weight:900;text-transform:uppercase;font-size:12px}
 .clock-stopped-badge{color:var(--muted);font-weight:900;text-transform:uppercase;font-size:12px}
 .clock-fixed-note{border:1px solid rgba(57,168,255,.45);background:#071018;border-radius:14px;padding:10px;color:#dcecff;margin-bottom:10px}
+
+.auth-screen{min-height:calc(100vh - 110px);display:grid;place-items:center;padding:18px}
+.auth-card{width:min(100%,460px);border:1px solid rgba(255,122,24,.55);background:linear-gradient(145deg,#17202b,#070b10);border-radius:26px;padding:20px;box-shadow:var(--shadow),0 0 34px rgba(255,122,24,.16)}
+.auth-logo{width:82px;height:82px;border-radius:25px;display:grid;place-items:center;margin:0 auto 12px;background:linear-gradient(145deg,#ff8c21,#923b08);color:#fff;font-size:32px;font-weight:900;box-shadow:0 0 28px rgba(255,122,24,.35)}
+.auth-card h2{margin:0;text-align:center;text-transform:uppercase;letter-spacing:.8px}.auth-card p{text-align:center;color:var(--muted);margin:6px 0 16px}
+.auth-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:12px}.auth-tabs button{border:1px solid rgba(104,121,139,.4);background:#0b1118;color:white;border-radius:12px;padding:10px 6px;font-weight:900;text-transform:uppercase;font-size:11px}.auth-tabs button.active{background:linear-gradient(145deg,var(--orange),#8d3908);border-color:var(--orange)}
+.auth-actions{display:grid;gap:8px;margin-top:12px}.auth-actions button{border:1px solid rgba(104,121,139,.45);background:linear-gradient(145deg,#17222f,#0d131b);color:white;border-radius:14px;padding:12px;font-weight:900;text-transform:uppercase}.auth-actions .primary{background:linear-gradient(145deg,var(--orange),#8d3908);border-color:var(--orange)}
+.auth-note{margin-top:12px;border-left:4px solid var(--orange);background:#0b1118;color:var(--muted);border-radius:12px;padding:10px;font-size:12px}
+.role-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}.role-card{border:1px solid rgba(104,121,139,.4);background:#0a1017;border-radius:14px;padding:10px}.role-card b{display:block;color:#fff}.role-card small{display:block;color:var(--muted);margin-top:4px}
+.user-pill{display:inline-flex;align-items:center;gap:7px;padding:8px 10px;border-radius:999px;border:1px solid rgba(104,121,139,.45);background:#0a1017;color:#fff;font-size:12px}
+.locked-screen{border:1px solid #8f3c3c;background:linear-gradient(145deg,#231418,#0b1118);border-radius:18px;padding:14px;color:#fff}
+@media(max-width:520px){.role-grid,.auth-tabs{grid-template-columns:1fr}}

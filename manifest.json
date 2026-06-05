@@ -1,6 +1,6 @@
 {
-  "name": "Rolling Wrench AI Command Center V6.1 Clock Fix",
-  "short_name": "RWD AI V6.1",
+  "name": "Rolling Wrench AI Command Center V6.2 Auth",
+  "short_name": "RWD AI V6.2",
   "start_url": "./",
   "display": "standalone",
   "background_color": "#07090d",

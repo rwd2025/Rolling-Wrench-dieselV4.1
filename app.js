@@ -122,6 +122,7 @@ function renderHome(){
     </section>
 
     <section class="v5-hub-grid">
+      <button class="v5-hub-card" data-route="account"><b>Account / Roles</b><small>Login • users • permissions</small></button>
       <button class="v5-hub-card" data-route="dashboard"><b>Business Dashboard</b><small>Revenue • quotes • invoices • jobs</small></button>
       <button class="v5-hub-card" data-route="aioperator"><b>AI Operator</b><small>Ask AI to build anything</small></button>
       <button class="v5-hub-card" data-route="v52"><b>V5.2 Engine</b><small>AI • OCR • files • GPS • cloud</small></button>
@@ -1841,22 +1842,130 @@ function saveClock(id, show=true){
   return saveContinuousClock(id, show);
 }
 
+
+function ensureAuthV62(){
+  if(typeof ensureV6 === "function") ensureV6();
+  if(!state.auth) state.auth = {
+    mode:"demo",
+    isLoggedIn:true,
+    user:{email:"demo@rollingwrench.local", role:"Owner/Admin", name:"James Jacobs"},
+    shop:{id:"local-shop", name:(state.settings && state.settings.shop) || "Rolling Wrench Diesel LLC"},
+    remember:true
+  };
+  if(!state.auth.shop) state.auth.shop = {id:"local-shop", name:(state.settings && state.settings.shop) || "Rolling Wrench Diesel LLC"};
+  if(!state.auth.user) state.auth.user = {email:"demo@rollingwrench.local", role:"Owner/Admin", name:"James Jacobs"};
+}
+function authIsLoggedIn(){
+  ensureAuthV62();
+  return state.auth.mode==="demo" || !!state.auth.isLoggedIn;
+}
+function authCanAccess(route){
+  ensureAuthV62();
+  if(state.auth.mode==="demo") return true;
+  const role = (state.auth.user && state.auth.user.role) || "Technician";
+  if(role==="Owner/Admin") return true;
+  if(role==="Operations Manager") return !["settings"].includes(route);
+  if(role==="Technician") return ["home","clock","workorders","schedule","truck","repair","fault","repairhud","parts","camera","pindrop","techmode","ai","memory"].includes(route);
+  if(role==="Customer") return ["customerportal","pindrop","invoices","quotes","home"].includes(route);
+  return true;
+}
+async function supabaseAuthRequest(path, body){
+  ensureSupabaseConfigured();
+  const res = await fetch(`${state.supabase.url}/auth/v1/${path}`, {
+    method:"POST",
+    headers:{"Content-Type":"application/json","apikey":state.supabase.anonKey},
+    body:JSON.stringify(body)
+  });
+  const text = await res.text();
+  let data = {};
+  try{ data = text ? JSON.parse(text) : {}; }catch(e){ data = {raw:text}; }
+  if(!res.ok) throw new Error(data.error_description || data.msg || text || res.statusText);
+  return data;
+}
+async function signInSupabase(email,password){
+  const data = await supabaseAuthRequest("token?grant_type=password",{email,password});
+  state.auth.mode="supabase"; state.auth.isLoggedIn=true; state.auth.session=data;
+  state.auth.user={email, role:(state.auth.user && state.auth.user.role) || "Owner/Admin", name:email.split("@")[0]};
+  saveState(); return data;
+}
+async function createSupabaseAccount(email,password,role,shop){
+  const data = await supabaseAuthRequest("signup",{email,password});
+  state.auth.mode="supabase"; state.auth.isLoggedIn=true; state.auth.session=data;
+  state.auth.user={email, role:role || "Owner/Admin", name:email.split("@")[0]};
+  state.auth.shop={id:"pending-shop", name:shop || "Rolling Wrench Diesel LLC"};
+  saveState(); return data;
+}
+async function sendPasswordReset(email){ return await supabaseAuthRequest("recover",{email}); }
+function logoutAuth(){ ensureAuthV62(); state.auth.isLoggedIn=false; state.auth.session=null; if(state.auth.mode==="demo") state.auth.mode="locked"; saveState(); }
+function authBadgeHtml(){ ensureAuthV62(); return `<span class="user-pill">👤 ${state.auth.user?.name || state.auth.user?.email || "User"} • ${state.auth.user?.role || "Role"} • ${state.auth.mode}</span>`; }
+
+
+function renderLogin(tab="signin"){
+  ensureAuthV62();
+  $("#screen").innerHTML = `<section class="auth-screen"><div class="auth-card">
+    <div class="auth-logo">RW</div><h2>Rolling Wrench AI</h2><p>Command Center Login</p>
+    <div class="auth-tabs"><button class="${tab==="signin"?'active':''}" data-auth-tab="signin">Sign In</button><button class="${tab==="create"?'active':''}" data-auth-tab="create">Create</button><button class="${tab==="forgot"?'active':''}" data-auth-tab="forgot">Forgot</button></div>
+    <div class="form-grid">
+      <label>Email<input id="authEmail" type="email" value="${state.auth.user?.email || ""}" placeholder="you@shop.com"></label>
+      ${tab!=="forgot" ? `<label>Password<input id="authPassword" type="password" placeholder="Password"></label>` : ""}
+      ${tab==="create" ? `<label>Role<select id="authRole"><option>Owner/Admin</option><option>Operations Manager</option><option>Technician</option><option>Customer</option></select></label>` : ""}
+      <label>Shop Name<input id="authShopName" value="${state.auth.shop?.name || state.settings?.shop || "Rolling Wrench Diesel LLC"}"></label>
+    </div>
+    <div class="auth-actions">
+      ${tab==="signin" ? `<button class="primary" id="authSignIn">Sign In</button>` : ""}
+      ${tab==="create" ? `<button class="primary" id="authCreate">Create Account</button>` : ""}
+      ${tab==="forgot" ? `<button class="primary" id="authForgot">Send Reset</button>` : ""}
+      <button id="authDemo">Continue Local Demo Mode</button>
+    </div>
+    <div class="auth-note">Supabase Auth is wired. Local Demo Mode lets you keep testing before RLS/user roles are fully locked down.</div>
+  </div></section>`;
+  $$("[data-auth-tab]").forEach(b=>b.onclick=()=>renderLogin(b.dataset.authTab));
+  $("#authDemo").onclick=()=>{state.auth.mode="demo";state.auth.isLoggedIn=true;state.auth.user={email:"demo@rollingwrench.local",role:"Owner/Admin",name:"James Jacobs"};state.auth.shop={id:"local-shop",name:$("#authShopName").value||"Rolling Wrench Diesel LLC"};saveState();toast("Demo mode");setRoute("home");};
+  if($("#authSignIn")) $("#authSignIn").onclick=async()=>{try{$("#authSignIn").textContent="Signing in...";await signInSupabase($("#authEmail").value,$("#authPassword").value);state.auth.shop.name=$("#authShopName").value;saveState();toast("Signed in");setRoute("home");}catch(e){$(".auth-note").textContent=e.message;$("#authSignIn").textContent="Sign In";toast("Sign in failed");}};
+  if($("#authCreate")) $("#authCreate").onclick=async()=>{try{$("#authCreate").textContent="Creating...";await createSupabaseAccount($("#authEmail").value,$("#authPassword").value,$("#authRole").value,$("#authShopName").value);toast("Account created");setRoute("home");}catch(e){$(".auth-note").textContent=e.message;$("#authCreate").textContent="Create Account";toast("Create failed");}};
+  if($("#authForgot")) $("#authForgot").onclick=async()=>{try{$("#authForgot").textContent="Sending...";await sendPasswordReset($("#authEmail").value);$(".auth-note").textContent="Password reset email sent if account exists.";toast("Reset sent");}catch(e){$(".auth-note").textContent=e.message;toast("Reset failed");}$("#authForgot").textContent="Send Reset";};
+}
+function renderAuthSettings(){
+  ensureAuthV62();
+  $("#screen").innerHTML = `${pageHead("Account / Roles","saveAuthSettings")}
+    <section class="form-panel form-grid">
+      <div class="backend-banner"><b>Authentication Foundation</b><small>Supabase Auth + local demo mode + role placeholders.</small></div>
+      <div>${authBadgeHtml()}</div>
+      <label>User Name<input id="authUserName" value="${state.auth.user?.name || ""}"></label>
+      <label>Email<input id="authUserEmail" value="${state.auth.user?.email || ""}"></label>
+      <label>Role<select id="authUserRole"><option ${state.auth.user?.role==="Owner/Admin"?"selected":""}>Owner/Admin</option><option ${state.auth.user?.role==="Operations Manager"?"selected":""}>Operations Manager</option><option ${state.auth.user?.role==="Technician"?"selected":""}>Technician</option><option ${state.auth.user?.role==="Customer"?"selected":""}>Customer</option></select></label>
+      <label>Shop Name<input id="authShop" value="${state.auth.shop?.name || state.settings?.shop || ""}"></label>
+      <div class="role-grid"><div class="role-card"><b>Owner/Admin</b><small>Full access</small></div><div class="role-card"><b>Operations Manager</b><small>Customers, schedule, invoices, quotes</small></div><div class="role-card"><b>Technician</b><small>Clock, jobs, work orders, photos</small></div><div class="role-card"><b>Customer</b><small>Approve/sign/view/send location</small></div></div>
+      <div class="smart-action-row"><button id="authLogout">Logout</button><button data-route="login">Login Screen</button><button data-route="supabase">Supabase</button></div>
+    </section>`;
+  bindPageTools();
+  $("#saveAuthSettings").onclick=()=>{state.auth.user.name=$("#authUserName").value;state.auth.user.email=$("#authUserEmail").value;state.auth.user.role=$("#authUserRole").value;state.auth.shop.name=$("#authShop").value;saveState();toast("Account saved");};
+  $("#authLogout").onclick=()=>{logoutAuth();toast("Logged out");setRoute("login");};
+}
+
 const routes = {
   home:renderHome, clock:renderClock, truck:renderTruck, ai:renderAi, parts:renderParts, fault:renderFault,
   repairhud:renderRepairHud, quotes:renderQuotes, invoices:renderInvoices, workorders:renderWorkOrders,
   schedule:renderSchedule, customers:renderCustomers, pindrop:renderPinDrop, camera:renderCamera, reports:renderReports,
-  memory:renderMemory, suppliers:renderSuppliers, pmdue:renderPmDue, settings:renderSettingsSafe, alerts:renderAlerts, workflow:renderWorkflowHub, pmmanager:renderPMManager, inventory:renderInventory, supplierpricing:renderSupplierPricing, notifications:renderNotifications, signin:renderSignInPreview, supabase:renderSupabaseSync, v52:renderV52Dashboard, dashboard:renderBusinessDashboard, aioperator:renderAIOperator, photointel:renderPhotoIntelligence, schedulecommand:renderScheduleCommand, customerportal:renderCustomerPortal, techmode:renderTechMode, about:renderAboutLegal, aiengine:renderAiEngine, realocr:renderRealOCR, filestorage:renderFileStorage, gpsmanager:renderGPSManager, repair:renderRepair, business:renderBusiness
+  memory:renderMemory, suppliers:renderSuppliers, pmdue:renderPmDue, settings:renderSettingsSafe, alerts:renderAlerts, workflow:renderWorkflowHub, pmmanager:renderPMManager, inventory:renderInventory, supplierpricing:renderSupplierPricing, notifications:renderNotifications, signin:renderSignInPreview, supabase:renderSupabaseSync, v52:renderV52Dashboard, dashboard:renderBusinessDashboard, aioperator:renderAIOperator, photointel:renderPhotoIntelligence, schedulecommand:renderScheduleCommand, customerportal:renderCustomerPortal, techmode:renderTechMode, about:renderAboutLegal, login:renderLogin, account:renderAuthSettings, aiengine:renderAiEngine, realocr:renderRealOCR, filestorage:renderFileStorage, gpsmanager:renderGPSManager, repair:renderRepair, business:renderBusiness
 };
 function render(route=currentRoute()){
   try{
+    ensureAuthV62();
     if(!route) route="home";
+    if(route!=="login" && !authIsLoggedIn()){ renderLogin("signin"); return; }
+    if(route!=="login" && !authCanAccess(route)){
+      $("#screen").innerHTML = `<section class="locked-screen"><b>Access Restricted</b><p>Your role does not have access to ${route}.</p><button class="action-btn primary" data-route="home">Go Home</button></section>`;
+      return;
+    }
     const fn=routes[route] || renderHome;
     fn();
     $$(".bottom-nav button").forEach(b=>b.classList.toggle("active", b.dataset.route===route || (route==="home" && b.dataset.route==="home")));
   }catch(err){
     console.error(err);
-    if(route==="settings") renderSettingsSafe();
-    else renderSafeError(route, err);
+    if(route==="settings" && typeof renderSettingsSafe==="function") renderSettingsSafe();
+    else if(typeof renderSafeError==="function") renderSafeError(route, err);
+    else $("#screen").innerHTML = `<section class="error-panel"><b>Error</b><small>${err.message}</small></section>`;
   }
 }
 
