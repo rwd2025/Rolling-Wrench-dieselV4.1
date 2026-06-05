@@ -1855,3 +1855,9 @@ html,body,#app,#screen{max-width:100vw!important;overflow-x:hidden!important}
   color:#fff;
   padding:24px;
 }
+
+/* V8.3c home data repair */
+.home-repair-note{border:1px solid #39a8ff;background:#071018;color:#dcecff;border-radius:16px;padding:12px;margin:12px}
+
+/* V8.3d route/button fix visual fallback */
+.route-fixed-note{border:1px solid #39a8ff;background:#071018;color:#dcecff;border-radius:16px;padding:12px;margin:12px}

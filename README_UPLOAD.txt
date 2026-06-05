@@ -260,3 +260,17 @@ V8.3b LOGIN BYPASS + HARD HOME FIX:
 - Keeps sign-in/auth for later settings phase, but does not block startup.
 - Replaces recovery/login failures with Home fallback.
 - Repeats startup recovery checks after DOMContentLoaded/load/hashchange/error.
+
+V8.3c HOME DATA REPAIR:
+- Repairs missing saved state fields before Home renders.
+- Ensures schedule/jobs/quotes/invoices/workorders/customers/parts/notes arrays exist.
+- Fixes currentRoute hardcoded home bug.
+- Makes Home rows defensive against old localStorage data.
+- Adds fallback Home if renderHome still fails.
+
+V8.3d ROUTE/BUTTON BINDING FIX:
+- Adds global delegated click handler for every [data-route] button.
+- Fixes bottom nav/cards not opening pages.
+- Adds route aliases: Repair -> Repair HUD, Business -> Dashboard, AI -> Brain.
+- Overrides setRoute/currentRoute after load.
+- Adds safe fallback route rendering if normal render crashes.

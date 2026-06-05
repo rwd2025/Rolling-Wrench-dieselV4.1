@@ -1,4 +1,144 @@
 
+/* ===== V8.3d GLOBAL ROUTE/BUTTON FIX ===== */
+function rwdResolveRoute(route){
+  route = String(route || "home").replace("#","").toLowerCase();
+  const aliases = {
+    ai:"brain",
+    rwai:"brain",
+    quote:"quotes",
+    invoice:"invoices",
+    wo:"workorders",
+    workorder:"workorders",
+    repair:"repairhud",
+    business:"dashboard",
+    schedule:"schedule",
+    home:"home",
+    truck:"truck",
+    settings:"settings"
+  };
+  return aliases[route] || route || "home";
+}
+function rwdSafeRenderRoute(route){
+  route = rwdResolveRoute(route);
+  try{
+    if(route !== "brain" && route !== "ai"){
+      document.body.classList.remove("rw-ai-mode","ai-lock","ai-full-open");
+    }
+  }catch(e){}
+  try{
+    if(typeof render === "function"){
+      render(route);
+      return true;
+    }
+  }catch(e){
+    console.warn("main render failed", route, e);
+  }
+  try{
+    const fn = window["render" + route.charAt(0).toUpperCase() + route.slice(1)];
+    if(typeof fn === "function"){
+      fn();
+      return true;
+    }
+  }catch(e){}
+  try{
+    if(route==="home" && typeof rwdSafeRenderHome==="function") return rwdSafeRenderHome();
+    if(route==="home" && typeof renderHome==="function"){ renderHome(); return true; }
+    if(route==="settings" && typeof renderSettings==="function"){ renderSettings(); return true; }
+    if(route==="truck" && typeof renderTruck==="function"){ renderTruck(); return true; }
+    if(route==="quotes" && typeof renderQuotes==="function"){ renderQuotes(); return true; }
+    if(route==="invoices" && typeof renderInvoices==="function"){ renderInvoices(); return true; }
+    if(route==="workorders" && typeof renderWorkOrders==="function"){ renderWorkOrders(); return true; }
+    if(route==="brain" && typeof renderRW8Brain==="function"){ renderRW8Brain(); return true; }
+    if(route==="brain" && typeof renderBrainV72==="function"){ renderBrainV72(); return true; }
+    if(route==="repairhud" && typeof renderRepairHud==="function"){ renderRepairHud(); return true; }
+    if(route==="schedule" && typeof renderSchedule==="function"){ renderSchedule(); return true; }
+  }catch(e){
+    console.warn("fallback route failed", route, e);
+  }
+  try{
+    const screen=document.querySelector("#screen");
+    if(screen){
+      screen.innerHTML = `<div class="page-head"><button class="action-btn" data-route="home">← Back</button><h2>${route.toUpperCase()}</h2></div><section class="form-panel"><div class="output">This page is loading. Route fixed: ${route}</div></section>`;
+    }
+  }catch(e){}
+  return false;
+}
+window.rwdHardSetRoute = function(route){
+  route = rwdResolveRoute(route);
+  try{ history.replaceState(null,"","#"+route); }catch(e){ location.hash=route; }
+  setTimeout(()=>rwdSafeRenderRoute(route), 0);
+};
+document.addEventListener("click", function(e){
+  const el = e.target.closest("[data-route]");
+  if(!el) return;
+  e.preventDefault();
+  e.stopPropagation();
+  window.rwdHardSetRoute(el.getAttribute("data-route"));
+}, true);
+window.addEventListener("hashchange", function(){
+  const route = (location.hash || "#home").replace("#","");
+  setTimeout(()=>rwdSafeRenderRoute(route), 0);
+});
+window.addEventListener("load", function(){
+  setTimeout(()=>rwdSafeRenderRoute((location.hash || "#home").replace("#","")), 100);
+});
+
+
+/* ===== V8.3c HOME DATA REPAIR ===== */
+function rwdRepairState(){
+  try{
+    window.state = window.state || {};
+    state.settings = Object.assign({shop:"Rolling Wrench Diesel", phone:"260-502-6222", laborRate:135, serviceCall:250, tax:0, cardFee:0}, state.settings || {});
+    state.truck = Object.assign({unit:"No Active Truck", vin:"NONE", customer:"", engine:"Cummins X15", transmission:"", mileage:"", cpl:""}, state.truck || {});
+    state.jobs = state.jobs || {};
+    ["job1","job2","job3"].forEach((id,i)=>{
+      state.jobs[id] = Object.assign({name:`Job ${i+1}`, customer:"", seconds:0, baseSeconds:0, startTimestamp:null, running:false, saved:[], status:"READY"}, state.jobs[id] || {});
+    });
+    ["invoices","quotes","workorders","customers","schedule","parts","notes","pins","pm","trucks","notifications","files","repairMemory","aiConversations","pmRecords"].forEach(k=>{
+      if(!Array.isArray(state[k])) state[k]=[];
+    });
+    if(typeof saveState==="function") saveState();
+  }catch(e){
+    console.warn("rwdRepairState failed", e);
+  }
+}
+function rwdSafeRenderHome(){
+  try{
+    rwdRepairState();
+    if(typeof renderHome==="function"){
+      renderHome();
+      return true;
+    }
+  }catch(e){
+    console.error("Home render failed after repair", e);
+    const screen=document.querySelector("#screen");
+    if(screen){
+      screen.innerHTML = `
+        <section class="top-status-grid">
+          <article class="hero-card"><h3>Time Clock</h3><div class="big-time">00:00:00</div><small>READY</small><div class="money">$0.00</div><button class="hero-action" data-route="clock">Open Clock</button></article>
+          <article class="hero-card"><h3>Active Truck</h3><div class="truck-info-line"><span>Unit</span><b>No Active Truck</b></div><div class="truck-info-line"><span>VIN</span><b>NONE</b></div><div class="truck-info-line"><span>Engine</span><b>Cummins X15</b></div><button class="hero-action" data-route="truck">Truck Profile</button></article>
+          <article class="hero-card"><h3>System</h3><div class="ready-big">Ready</div><div class="system-sub">Home recovered</div><button class="hero-action" data-route="settings">Settings</button></article>
+        </section>
+        <div class="rwd-ai-bar clean-ai-bar" data-route="ai"><div class="ai-orb">RW</div><div class="ai-copy"><strong>Ask anything...</strong><span>Rolling Wrench AI</span></div></div>
+        <section class="module-grid">
+          <button class="module-card" data-route="truck"><span class="icon">🔎</span><b>VIN Lookup</b><small>Decode / save truck</small></button>
+          <button class="module-card" data-route="parts"><span class="icon">🔧</span><b>Parts Lookup</b><small>Parts + cross refs</small></button>
+          <button class="module-card" data-route="fault"><span class="icon">⚕</span><b>Fault Doctor</b><small>SPN/FMI workflow</small></button>
+          <button class="module-card" data-route="quotes"><span class="icon">▣</span><b>Smart Quotes</b><small>Build estimate</small></button>
+          <button class="module-card" data-route="invoices"><span class="icon">▥</span><b>Invoices</b><small>Paper bill</small></button>
+          <button class="module-card" data-route="settings"><span class="icon">⚙</span><b>Settings</b><small>Shop defaults</small></button>
+        </section>`;
+      if(typeof bindPageTools==="function") bindPageTools();
+      document.querySelectorAll("[data-route]").forEach(el=>{
+        el.onclick=()=>{ if(typeof setRoute==="function") setRoute(el.dataset.route); else location.hash=el.dataset.route; };
+      });
+      return true;
+    }
+  }
+  return false;
+}
+
+
 /* ===== V8.3b LOGIN BYPASS + HARD HOME FIX ===== */
 (function(){
   window.RWD_DISABLE_STARTUP_LOGIN = true;
@@ -87,7 +227,7 @@
     let ok=false;
     try{
       if(typeof renderHome === "function"){
-        renderHome();
+        rwdSafeRenderHome();
         ok=true;
       }
     }catch(e){
@@ -155,7 +295,7 @@ function clockDollars(sec){ return (Number(sec||0)/3600) * Number(state.settings
 function totalInvoiceMoney(){ return state.invoices.reduce((a,i)=>a+Number(i.total||0),0); }
 function homeEarnings(){ return totalInvoiceMoney() + clockDollars(totalSeconds()); }
 function setRoute(route){ location.hash = route; render(route); }
-function currentRoute(){ return ("#home").replace("#","") || "home"; }
+function currentRoute(){ return (location.hash || "#home").replace("#","") || "home"; }
 
 const modules = [
   ["truck","🔎","VIN Lookup","Decode / save truck"],
@@ -195,6 +335,7 @@ function bindPageTools(){
 function panelOutput(text){ return `<div class="output">${text || ""}</div>`; }
 
 function renderHome(){
+  rwdRepairState();
   const t=state.truck;
   $("#screen").innerHTML = `
     <section class="top-status-grid">
@@ -289,12 +430,12 @@ function renderHome(){
     </section>`;
 }
 function scheduleRows(){
-  const list = state.schedule.slice(0,3);
+  const list = (state.schedule||[]).slice(0,3);
   if(!list.length) return `<div class="schedule-row"><time>--</time><div><b>No jobs scheduled</b><small>Tap Schedule to add one</small></div><span></span></div>`;
   return list.map(x=>`<div class="schedule-row"><time>${x.time || "--"}</time><div><b>${x.customer || "Customer"}</b><small>${x.job || "Job"} • ${x.location || "Location"}</small></div><span class="badge">${x.tech || ""}</span></div>`).join("");
 }
 function recentRows(){
-  const recent = [...state.workorders.map(x=>({type:"WO",...x})), ...state.invoices.map(x=>({type:"INV",...x})), ...state.quotes.map(x=>({type:"QUOTE",...x}))].slice(-3).reverse();
+  const recent = [...(state.workorders||[]).map(x=>({type:"WO",...x})), ...(state.invoices||[]).map(x=>({type:"INV",...x})), ...(state.quotes||[]).map(x=>({type:"QUOTE",...x}))].slice(-3).reverse();
   if(!recent.length) return `<div class="job-row"><b>--</b><div><b>No recent jobs</b><small>Create a work order or invoice</small></div><span></span></div>`;
   return recent.map(x=>`<div class="job-row"><b>${x.type}</b><div><b>${x.customer || "Customer"}</b><small>${x.desc || x.work || x.job || "Saved item"}</small></div><span class="badge">SAVED</span></div>`).join("");
 }
@@ -965,7 +1106,7 @@ function renderWorkOrders(){
       <label>Cause<textarea id="woCause"></textarea></label>
       <label>Correction<textarea id="woCorrection"></textarea></label>
       <label>Status<select id="woStatus"><option>Open</option><option>Diagnosing</option><option>Waiting Parts</option><option>In Progress</option><option>Complete</option><option>Invoiced</option></select></label>
-      <div class="output">${state.workorders.map(w=>`${w.status}: ${w.customer} — ${w.desc}`).join("\n") || "No saved work orders."}</div>
+      <div class="output">${(state.workorders||[]).map(w=>`${w.status}: ${w.customer} — ${w.desc}`).join("\n") || "No saved work orders."}</div>
     </section>`;
   bindPageTools();
   if($("#speakWO")) $("#speakWO").onclick=()=>startVoiceToField("woVoiceText", spoken=>$("#woComplaint").value=professionalizeWorkText(spoken));
@@ -2246,7 +2387,7 @@ function renderQuoteSendCenter(){
   $("#screen").innerHTML=`${pageHead("Send Quotes","",false)}
   <section class="form-panel">
     <div class="backend-banner"><b>Customer Quote Approval</b><small>Create approval links customers can open on phone, tablet, or computer. They can approve, decline, and sign.</small></div>
-    ${(state.quotes||[]).length ? state.quotes.map((q,i)=>`<div class="quote-list-card"><b>${q.customer || "Customer"} — ${money(q.total || 0)}</b><small>${q.desc || "Quote"}<br>${quoteStatusPill(q.status || "Pending")}</small><div class="smart-action-row"><button data-create-approval="${i}">Send Link</button><button data-route="communications">Text</button><button data-open-approval="${q.approvalId || ""}">Open Portal</button><button data-convert-invoice="${i}">Invoice</button></div><div class="share-link-box" id="quoteLink_${i}">${q.approvalId ? `${location.origin}${location.pathname}#quoteapproval-${q.approvalId}` : "No link yet"}</div></div>`).join("") : `<div class="output">No quotes saved yet. Create a Smart Quote first.</div>`}
+    ${(state.quotes||[]).length ? (state.quotes||[]).map((q,i)=>`<div class="quote-list-card"><b>${q.customer || "Customer"} — ${money(q.total || 0)}</b><small>${q.desc || "Quote"}<br>${quoteStatusPill(q.status || "Pending")}</small><div class="smart-action-row"><button data-create-approval="${i}">Send Link</button><button data-route="communications">Text</button><button data-open-approval="${q.approvalId || ""}">Open Portal</button><button data-convert-invoice="${i}">Invoice</button></div><div class="share-link-box" id="quoteLink_${i}">${q.approvalId ? `${location.origin}${location.pathname}#quoteapproval-${q.approvalId}` : "No link yet"}</div></div>`).join("") : `<div class="output">No quotes saved yet. Create a Smart Quote first.</div>`}
   </section>`;
   bindPageTools();
   $$("[data-create-approval]").forEach(btn=>btn.onclick=()=>{const i=Number(btn.dataset.createApproval);const a=makeQuoteApproval(i);$("#quoteLink_"+i).textContent=a.link;toast("Approval link ready");renderQuoteSendCenter();});
@@ -2362,7 +2503,7 @@ function renderInvoiceSendCenter(){
   $("#screen").innerHTML=`${pageHead("Send Invoices","",false)}
   <section class="form-panel">
     <div class="backend-banner"><b>Customer Invoice Portal</b><small>Send invoice links for viewing, signing, payment tracking, and Square payment link.</small></div>
-    ${(state.invoices||[]).length ? state.invoices.map((inv,i)=>`<div class="quote-list-card"><b>${inv.customer || "Customer"} — ${money(inv.total || 0)}</b><small>${inv.work || "Invoice"}<br>${invoiceStatusPill(inv.status || "Unpaid")}</small><div class="smart-action-row"><button data-create-invoice-link="${i}">Send Link</button><button data-route="communications">Text</button><button data-open-invoice="${inv.invoiceId || ""}">Open Portal</button><button data-mark-paid="${i}">Paid</button></div><div class="share-link-box" id="invoiceLink_${i}">${inv.invoiceId ? `${location.origin}${location.pathname}#invoiceportal-${inv.invoiceId}` : "No link yet"}</div></div>`).join("") : `<div class="output">No invoices saved yet.</div>`}
+    ${(state.invoices||[]).length ? (state.invoices||[]).map((inv,i)=>`<div class="quote-list-card"><b>${inv.customer || "Customer"} — ${money(inv.total || 0)}</b><small>${inv.work || "Invoice"}<br>${invoiceStatusPill(inv.status || "Unpaid")}</small><div class="smart-action-row"><button data-create-invoice-link="${i}">Send Link</button><button data-route="communications">Text</button><button data-open-invoice="${inv.invoiceId || ""}">Open Portal</button><button data-mark-paid="${i}">Paid</button></div><div class="share-link-box" id="invoiceLink_${i}">${inv.invoiceId ? `${location.origin}${location.pathname}#invoiceportal-${inv.invoiceId}` : "No link yet"}</div></div>`).join("") : `<div class="output">No invoices saved yet.</div>`}
   </section>`;
   bindPageTools();
   $$("[data-create-invoice-link]").forEach(btn=>btn.onclick=()=>{const i=Number(btn.dataset.createInvoiceLink);const link=makeInvoiceLink(i);$("#invoiceLink_"+i).textContent=link.link;toast("Invoice link ready");renderInvoiceSendCenter();});
@@ -4391,3 +4532,24 @@ function showLogin(){ return rwdBypassLoginAndHome ? rwdBypassLoginAndHome() : f
 function renderLogin(){ return rwdBypassLoginAndHome ? rwdBypassLoginAndHome() : false; }
 function renderSignin(){ return rwdBypassLoginAndHome ? rwdBypassLoginAndHome() : false; }
 function renderSignIn(){ return rwdBypassLoginAndHome ? rwdBypassLoginAndHome() : false; }
+
+
+function rwdClearBrokenLocalData(){
+  try{
+    localStorage.removeItem("RWD_V41_STATE");
+    localStorage.removeItem("RWD_AI_CLEAN_RESCUE_STATE_V1");
+    location.hash="home";
+    location.reload();
+  }catch(e){}
+}
+
+
+/* V8.3d setRoute override */
+setTimeout(function(){
+  window.setRoute = function(route){
+    window.rwdHardSetRoute(route);
+  };
+  window.currentRoute = function(){
+    return (location.hash || "#home").replace("#","") || "home";
+  };
+}, 0);
