@@ -149,3 +149,12 @@ V6.6 REAL BACKEND CONNECTION:
 - Added AI endpoint/OCR endpoint settings.
 - Added SQL setup screen in app.
 Next: create Storage bucket rwd-files and connect actual file upload endpoint/policies.
+
+V6.7 CUSTOMER COMMUNICATION CENTER:
+- Customer Messages screen.
+- Build/send SMS for quote, invoice, payment link, GPS request, appointment reminder.
+- Uses phone SMS app via sms: link.
+- Communication timeline with sent/opened/approved/paid status.
+- Message templates screen.
+- Send Quote/Send Invoice centers now include Text buttons.
+Next: Twilio/SMS API integration for automatic sent/opened delivery tracking.

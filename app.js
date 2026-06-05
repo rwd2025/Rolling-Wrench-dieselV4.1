@@ -127,6 +127,8 @@ function renderHome(){
       <button class="v5-hub-card" data-route="stability"><b>Stability Center</b><small>Button test • health check</small></button>
       <button class="v5-hub-card" data-route="externallinks"><b>External Links</b><small>Supabase customer links</small></button>
       <button class="v5-hub-card" data-route="backend"><b>Backend Center</b><small>Tables • storage • AI • OCR</small></button>
+      <button class="v5-hub-card" data-route="communications"><b>Customer Messages</b><small>Text quote • invoice • GPS • payment</small></button>
+      <button class="v5-hub-card" data-route="templates"><b>Message Templates</b><small>Default text messages</small></button>
       <button class="v5-hub-card" data-route="account"><b>Account / Roles</b><small>Login • users • permissions</small></button>
       <button class="v5-hub-card" data-route="dashboard"><b>Business Dashboard</b><small>Revenue • quotes • invoices • jobs</small></button>
       <button class="v5-hub-card" data-route="aioperator"><b>AI Operator</b><small>Ask AI to build anything</small></button>
@@ -2102,7 +2104,7 @@ function renderQuoteSendCenter(){
   $("#screen").innerHTML=`${pageHead("Send Quotes","",false)}
   <section class="form-panel">
     <div class="backend-banner"><b>Customer Quote Approval</b><small>Create approval links customers can open on phone, tablet, or computer. They can approve, decline, and sign.</small></div>
-    ${(state.quotes||[]).length ? state.quotes.map((q,i)=>`<div class="quote-list-card"><b>${q.customer || "Customer"} — ${money(q.total || 0)}</b><small>${q.desc || "Quote"}<br>${quoteStatusPill(q.status || "Pending")}</small><div class="smart-action-row"><button data-create-approval="${i}">Send Link</button><button data-open-approval="${q.approvalId || ""}">Open Portal</button><button data-convert-invoice="${i}">Invoice</button></div><div class="share-link-box" id="quoteLink_${i}">${q.approvalId ? `${location.origin}${location.pathname}#quoteapproval-${q.approvalId}` : "No link yet"}</div></div>`).join("") : `<div class="output">No quotes saved yet. Create a Smart Quote first.</div>`}
+    ${(state.quotes||[]).length ? state.quotes.map((q,i)=>`<div class="quote-list-card"><b>${q.customer || "Customer"} — ${money(q.total || 0)}</b><small>${q.desc || "Quote"}<br>${quoteStatusPill(q.status || "Pending")}</small><div class="smart-action-row"><button data-create-approval="${i}">Send Link</button><button data-route="communications">Text</button><button data-open-approval="${q.approvalId || ""}">Open Portal</button><button data-convert-invoice="${i}">Invoice</button></div><div class="share-link-box" id="quoteLink_${i}">${q.approvalId ? `${location.origin}${location.pathname}#quoteapproval-${q.approvalId}` : "No link yet"}</div></div>`).join("") : `<div class="output">No quotes saved yet. Create a Smart Quote first.</div>`}
   </section>`;
   bindPageTools();
   $$("[data-create-approval]").forEach(btn=>btn.onclick=()=>{const i=Number(btn.dataset.createApproval);const a=makeQuoteApproval(i);$("#quoteLink_"+i).textContent=a.link;toast("Approval link ready");renderQuoteSendCenter();});
@@ -2218,7 +2220,7 @@ function renderInvoiceSendCenter(){
   $("#screen").innerHTML=`${pageHead("Send Invoices","",false)}
   <section class="form-panel">
     <div class="backend-banner"><b>Customer Invoice Portal</b><small>Send invoice links for viewing, signing, payment tracking, and Square payment link.</small></div>
-    ${(state.invoices||[]).length ? state.invoices.map((inv,i)=>`<div class="quote-list-card"><b>${inv.customer || "Customer"} — ${money(inv.total || 0)}</b><small>${inv.work || "Invoice"}<br>${invoiceStatusPill(inv.status || "Unpaid")}</small><div class="smart-action-row"><button data-create-invoice-link="${i}">Send Link</button><button data-open-invoice="${inv.invoiceId || ""}">Open Portal</button><button data-mark-paid="${i}">Paid</button></div><div class="share-link-box" id="invoiceLink_${i}">${inv.invoiceId ? `${location.origin}${location.pathname}#invoiceportal-${inv.invoiceId}` : "No link yet"}</div></div>`).join("") : `<div class="output">No invoices saved yet.</div>`}
+    ${(state.invoices||[]).length ? state.invoices.map((inv,i)=>`<div class="quote-list-card"><b>${inv.customer || "Customer"} — ${money(inv.total || 0)}</b><small>${inv.work || "Invoice"}<br>${invoiceStatusPill(inv.status || "Unpaid")}</small><div class="smart-action-row"><button data-create-invoice-link="${i}">Send Link</button><button data-route="communications">Text</button><button data-open-invoice="${inv.invoiceId || ""}">Open Portal</button><button data-mark-paid="${i}">Paid</button></div><div class="share-link-box" id="invoiceLink_${i}">${inv.invoiceId ? `${location.origin}${location.pathname}#invoiceportal-${inv.invoiceId}` : "No link yet"}</div></div>`).join("") : `<div class="output">No invoices saved yet.</div>`}
   </section>`;
   bindPageTools();
   $$("[data-create-invoice-link]").forEach(btn=>btn.onclick=()=>{const i=Number(btn.dataset.createInvoiceLink);const link=makeInvoiceLink(i);$("#invoiceLink_"+i).textContent=link.link;toast("Invoice link ready");renderInvoiceSendCenter();});
@@ -2544,11 +2546,126 @@ alter table public.file_records disable row level security;`}</section>`;
   bindPageTools();
 }
 
+
+function ensureV67(){
+  if(typeof ensureV66 === "function") ensureV66();
+  if(!state.communications) state.communications = [];
+  if(!state.messageTemplates) state.messageTemplates = {
+    quote:"Rolling Wrench Diesel: Your quote is ready. Please review and sign here:",
+    invoice:"Rolling Wrench Diesel: Your invoice is ready. View/sign/pay here:",
+    payment:"Rolling Wrench Diesel: Payment link:",
+    gps:"Rolling Wrench Diesel: Please send your current location for roadside service:",
+    reminder:"Rolling Wrench Diesel reminder: You have an upcoming service appointment."
+  };
+}
+function commStatusPill(status){
+  const s=(status||"sent").toLowerCase();
+  return `<span class="comm-status ${s}">${status||"Sent"}</span>`;
+}
+function commAdd(type, customer, phone, message, link, status="Sent"){
+  ensureV67();
+  const rec={id:"COMM-"+Date.now(),type,customer,phone,message,link,status,date:new Date().toLocaleString()};
+  state.communications.unshift(rec);
+  saveState();
+  return rec;
+}
+function commPhoneLink(phone,message){
+  const p=(phone||"").replace(/[^\d+]/g,"");
+  return `sms:${p}?&body=${encodeURIComponent(message||"")}`;
+}
+function commBuildMessage(type, customer, link){
+  ensureV67();
+  const base = state.messageTemplates[type] || "Rolling Wrench Diesel:";
+  return `${base} ${link || ""}`.trim();
+}
+function commLatestQuoteLink(){
+  if((state.externalLinks||[]).find(l=>l.kind==="quoteapproval")) return (state.externalLinks||[]).find(l=>l.kind==="quoteapproval").link;
+  if((state.quoteApprovals||[])[0]) return state.quoteApprovals[0].link;
+  return "";
+}
+function commLatestInvoiceLink(){
+  if((state.externalLinks||[]).find(l=>l.kind==="invoiceportal")) return (state.externalLinks||[]).find(l=>l.kind==="invoiceportal").link;
+  if((state.invoiceLinks||[])[0]) return state.invoiceLinks[0].link;
+  return "";
+}
+function commMark(id,status){
+  const rec=(state.communications||[]).find(c=>c.id===id);
+  if(rec){rec.status=status;rec.updated=new Date().toLocaleString();saveState();}
+}
+function renderCommunicationCenter(){
+  ensureV67();
+  const customer=state.truck.customer || "";
+  $("#screen").innerHTML=`${pageHead("Customer Messages","saveCommSettings")}
+  <section class="backend-banner"><b>Customer Communication Center</b><small>Text quotes, invoices, payment links, GPS requests, appointment reminders, and track the timeline.</small></section>
+  <section class="form-panel form-grid">
+    <label>Customer<input id="commCustomer" value="${customer}" placeholder="Customer / company"></label>
+    <label>Phone<input id="commPhone" placeholder="Customer phone"></label>
+    <label>Type<select id="commType"><option value="quote">Quote</option><option value="invoice">Invoice</option><option value="payment">Payment Link</option><option value="gps">GPS Request</option><option value="reminder">Appointment Reminder</option><option value="custom">Custom</option></select></label>
+    <label>Link<input id="commLink" placeholder="Quote/invoice/payment/GPS link"></label>
+    <label>Message<textarea id="commMessage"></textarea></label>
+    <div class="comm-grid">
+      <button class="comm-action" id="buildMsg"><b>Build Message</b><small>Auto-fill text</small></button>
+      <button class="comm-action" id="openText"><b>Open Text</b><small>Use phone SMS app</small></button>
+      <button class="comm-action" id="markOpened"><b>Mark Opened</b><small>Customer viewed</small></button>
+      <button class="comm-action" id="markDone"><b>Mark Complete</b><small>Approved / Paid</small></button>
+    </div>
+    <div class="message-preview" id="commPreview">No message yet.</div>
+    <a class="sms-link" id="smsPreview" href="#">SMS link will appear here.</a>
+  </section>
+  <section class="settings-section">
+    <h3>Communication Timeline</h3>
+    <div class="timeline">
+      ${(state.communications||[]).length ? state.communications.map(c=>`<div class="timeline-item"><b>${c.type} — ${c.customer || "Customer"}</b><small>${c.date}<br>${c.message}<br>${c.link||""}</small>${commStatusPill(c.status)}<div class="smart-action-row"><button data-comm-status="${c.id}|Opened">Opened</button><button data-comm-status="${c.id}|Approved">Approved</button><button data-comm-status="${c.id}|Paid">Paid</button></div></div>`).join("") : `<div class="output">No communication history yet.</div>`}
+    </div>
+  </section>`;
+  bindPageTools();
+
+  function currentLinkForType(type){
+    if(type==="quote") return commLatestQuoteLink();
+    if(type==="invoice") return commLatestInvoiceLink();
+    if(type==="payment") return state.backend?.squareLink || "";
+    if(type==="gps") return `${location.origin}${location.pathname}#gpsmanager`;
+    return $("#commLink").value;
+  }
+  $("#commType").onchange=()=>{$("#commLink").value=currentLinkForType($("#commType").value);};
+  $("#buildMsg").onclick=()=>{
+    const type=$("#commType").value;
+    if(!$("#commLink").value) $("#commLink").value=currentLinkForType(type);
+    const msg=commBuildMessage(type,$("#commCustomer").value,$("#commLink").value);
+    $("#commMessage").value=msg;
+    $("#commPreview").textContent=msg;
+    $("#smsPreview").href=commPhoneLink($("#commPhone").value,msg);
+    $("#smsPreview").textContent=$("#smsPreview").href;
+  };
+  $("#openText").onclick=()=>{
+    const msg=$("#commMessage").value || commBuildMessage($("#commType").value,$("#commCustomer").value,$("#commLink").value);
+    const rec=commAdd($("#commType").value,$("#commCustomer").value,$("#commPhone").value,msg,$("#commLink").value,"Sent");
+    window.location.href=commPhoneLink($("#commPhone").value,msg);
+  };
+  $("#markOpened").onclick=()=>{if(state.communications[0]){state.communications[0].status="Opened";saveState();toast("Marked opened");renderCommunicationCenter();}};
+  $("#markDone").onclick=()=>{if(state.communications[0]){const t=state.communications[0].type;state.communications[0].status=t==="invoice"||t==="payment"?"Paid":"Approved";saveState();toast("Marked complete");renderCommunicationCenter();}};
+  $$("[data-comm-status]").forEach(btn=>btn.onclick=()=>{const [id,status]=btn.dataset.commStatus.split("|");commMark(id,status);renderCommunicationCenter();});
+  $("#saveCommSettings").onclick=()=>{state.messageTemplates[$("#commType").value]=$("#commMessage").value || state.messageTemplates[$("#commType").value];saveState();toast("Template saved");};
+}
+function renderCommunicationTemplates(){
+  ensureV67();
+  $("#screen").innerHTML=`${pageHead("Message Templates","saveTemplates")}
+  <section class="form-panel form-grid">
+    <label>Quote Template<textarea id="tplQuote">${state.messageTemplates.quote}</textarea></label>
+    <label>Invoice Template<textarea id="tplInvoice">${state.messageTemplates.invoice}</textarea></label>
+    <label>Payment Template<textarea id="tplPayment">${state.messageTemplates.payment}</textarea></label>
+    <label>GPS Request Template<textarea id="tplGps">${state.messageTemplates.gps}</textarea></label>
+    <label>Reminder Template<textarea id="tplReminder">${state.messageTemplates.reminder}</textarea></label>
+  </section>`;
+  bindPageTools();
+  $("#saveTemplates").onclick=()=>{state.messageTemplates={quote:$("#tplQuote").value,invoice:$("#tplInvoice").value,payment:$("#tplPayment").value,gps:$("#tplGps").value,reminder:$("#tplReminder").value};saveState();toast("Templates saved");};
+}
+
 const routes = {
   home:renderHome, clock:renderClock, truck:renderTruck, ai:renderAi, parts:renderParts, fault:renderFault,
   repairhud:renderRepairHud, quotes:renderQuotes, invoices:renderInvoices, workorders:renderWorkOrders,
   schedule:renderSchedule, customers:renderCustomers, pindrop:renderPinDrop, camera:renderCamera, reports:renderReports,
-  memory:renderMemory, suppliers:renderSuppliers, pmdue:renderPmDue, settings:renderSettingsSafe, alerts:renderAlerts, workflow:renderWorkflowHub, pmmanager:renderPMManager, inventory:renderInventory, supplierpricing:renderSupplierPricing, notifications:renderNotifications, signin:renderSignInPreview, supabase:renderSupabaseSync, v52:renderV52Dashboard, dashboard:renderBusinessDashboard, aioperator:renderAIOperator, photointel:renderPhotoIntelligence, schedulecommand:renderScheduleCommand, customerportal:renderCustomerPortalHub, sendquotes:renderQuoteSendCenter, sendinvoices:renderInvoiceSendCenter, stability:renderStabilityCenter, externallinks:renderExternalLinksCenter, storageprep:renderStoragePrep, backend:renderBackendCenter, backendsetup:renderBackendSetup, portalhub:renderCustomerPortalHub, techmode:renderTechMode, about:renderAboutLegal, login:renderLogin, account:renderAuthSettings, aiengine:renderAiEngine, realocr:renderRealOCR, filestorage:renderFileStorage, gpsmanager:renderGPSManager, repair:renderRepair, business:renderBusiness
+  memory:renderMemory, suppliers:renderSuppliers, pmdue:renderPmDue, settings:renderSettingsSafe, alerts:renderAlerts, workflow:renderWorkflowHub, pmmanager:renderPMManager, inventory:renderInventory, supplierpricing:renderSupplierPricing, notifications:renderNotifications, signin:renderSignInPreview, supabase:renderSupabaseSync, v52:renderV52Dashboard, dashboard:renderBusinessDashboard, aioperator:renderAIOperator, photointel:renderPhotoIntelligence, schedulecommand:renderScheduleCommand, customerportal:renderCustomerPortalHub, sendquotes:renderQuoteSendCenter, sendinvoices:renderInvoiceSendCenter, stability:renderStabilityCenter, externallinks:renderExternalLinksCenter, storageprep:renderStoragePrep, backend:renderBackendCenter, backendsetup:renderBackendSetup, communications:renderCommunicationCenter, templates:renderCommunicationTemplates, portalhub:renderCustomerPortalHub, techmode:renderTechMode, about:renderAboutLegal, login:renderLogin, account:renderAuthSettings, aiengine:renderAiEngine, realocr:renderRealOCR, filestorage:renderFileStorage, gpsmanager:renderGPSManager, repair:renderRepair, business:renderBusiness
 };
 function render(route=currentRoute()){
   try{

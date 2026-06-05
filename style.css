@@ -925,3 +925,91 @@ body.high-contrast{--line:#ffffff;--muted:#e9eef5}
   white-space:pre-wrap;
 }
 @media(max-width:520px){.backend-status-grid,.backend-action-grid{grid-template-columns:1fr}}
+
+
+/* ===== V6.7 CUSTOMER COMMUNICATION CENTER ===== */
+.comm-card{
+  border:1px solid rgba(104,121,139,.42);
+  background:linear-gradient(145deg,#17222f,#0d131b);
+  border-radius:18px;
+  padding:13px;
+  margin-bottom:10px;
+}
+.comm-card b{display:block;color:#fff;text-transform:uppercase}
+.comm-card small{display:block;color:var(--muted);margin-top:5px;white-space:pre-wrap}
+.comm-status{
+  display:inline-flex;
+  border:1px solid rgba(104,121,139,.45);
+  background:#071018;
+  border-radius:999px;
+  padding:6px 9px;
+  color:#fff;
+  font-size:11px;
+  font-weight:900;
+  text-transform:uppercase;
+  margin-top:7px;
+}
+.comm-status.sent{border-color:#39a8ff;color:#39a8ff}
+.comm-status.opened{border-color:#f2b84b;color:#f2b84b}
+.comm-status.approved,.comm-status.paid{border-color:var(--green);color:var(--green)}
+.comm-status.declined,.comm-status.unpaid{border-color:#ff7a7a;color:#ff7a7a}
+.comm-grid{
+  display:grid;
+  grid-template-columns:repeat(2,1fr);
+  gap:10px;
+}
+.comm-action{
+  border:1px solid rgba(255,122,24,.45);
+  background:linear-gradient(145deg,#17222f,#0d131b);
+  border-radius:18px;
+  color:#fff;
+  padding:14px;
+  text-align:left;
+}
+.comm-action b{display:block;color:var(--orange);text-transform:uppercase;letter-spacing:1px}
+.comm-action small{display:block;color:var(--muted);margin-top:5px}
+.timeline{
+  border-left:3px solid rgba(255,122,24,.55);
+  padding-left:12px;
+}
+.timeline-item{
+  position:relative;
+  border:1px solid rgba(104,121,139,.35);
+  background:#0a1017;
+  border-radius:14px;
+  padding:10px;
+  margin-bottom:9px;
+}
+.timeline-item:before{
+  content:"";
+  position:absolute;
+  left:-20px;
+  top:14px;
+  width:11px;
+  height:11px;
+  border-radius:50%;
+  background:var(--orange);
+  box-shadow:0 0 10px rgba(255,122,24,.5);
+}
+.timeline-item b{display:block;color:#fff}
+.timeline-item small{display:block;color:var(--muted);margin-top:4px}
+.message-preview{
+  border:1px solid rgba(57,168,255,.45);
+  background:#050a0f;
+  color:#eaf4ff;
+  border-radius:16px;
+  padding:12px;
+  white-space:pre-wrap;
+  min-height:120px;
+}
+.sms-link{
+  display:block;
+  border:1px dashed rgba(57,168,255,.55);
+  border-radius:14px;
+  background:#071018;
+  color:#dcecff;
+  padding:10px;
+  margin-top:8px;
+  word-break:break-word;
+}
+@media(max-width:520px){.comm-grid{grid-template-columns:1fr}}
