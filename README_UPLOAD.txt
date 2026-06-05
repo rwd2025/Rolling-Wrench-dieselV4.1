@@ -246,3 +246,17 @@ V8.1 AI CHAT BOX FIX:
 - Added fallback CSS for older V7.2 AI bar if browser cache still shows it.
 
 V8.2: mobile button fit, diesel diagnostic fallback knowledge, real AI endpoint path, better low-boost/overheat/SPN/air-leak answers.
+
+V8.3 STARTUP/HOME FIX:
+- App forces Home screen on startup.
+- Startup Recovery screen hidden.
+- If Home render fails, fallback Home loads automatically.
+- Removes AI layout lock classes on startup.
+- Keeps V8.2 AI/mobile fixes.
+
+V8.3b LOGIN BYPASS + HARD HOME FIX:
+- Disables startup login/sign-in gate.
+- Forces Home first.
+- Keeps sign-in/auth for later settings phase, but does not block startup.
+- Replaces recovery/login failures with Home fallback.
+- Repeats startup recovery checks after DOMContentLoaded/load/hashchange/error.
