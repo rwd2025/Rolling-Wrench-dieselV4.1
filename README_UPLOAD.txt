@@ -245,32 +245,50 @@ V8.1 AI CHAT BOX FIX:
 - Keyboard focus auto-scrolls newest messages/input.
 - Added fallback CSS for older V7.2 AI bar if browser cache still shows it.
 
-V8.2: mobile button fit, diesel diagnostic fallback knowledge, real AI endpoint path, better low-boost/overheat/SPN/air-leak answers.
+V8.5 STABLE BASE:
+- Built from the V8.1 AI Chat Box Fix base.
+- Removed/avoided V8.3 startup/login/router recovery patches.
+- No forced login gate.
+- No Startup Recovery loop.
+- No forced route override loop.
+- Keeps V8.1 AI/chat layout fixes.
+- Adds only safe state normalization so old phone data does not crash modules.
+TEST ORDER:
+1. Home loads.
+2. Bottom nav Home/Truck/Repair/Business/Schedule.
+3. Settings opens.
+4. Ask Rolling Wrench AI opens.
+5. Quotes/Invoicing still open.
 
-V8.3 STARTUP/HOME FIX:
-- App forces Home screen on startup.
-- Startup Recovery screen hidden.
-- If Home render fails, fallback Home loads automatically.
-- Removes AI layout lock classes on startup.
-- Keeps V8.2 AI/mobile fixes.
+V8.6 SAFE FEATURE LAYER:
+- Built on V8.5 Stable.
+- NO login gate.
+- NO startup recovery.
+- NO forced home redirect.
+- Adds Smart Quotes with signature pad.
+- Adds saved quote/customer link tracking.
+- Adds Repair Memory save/search/delete.
+- Adds persistent Time Clock.
+- Adds Schedule Board.
+- Adds Earnings Graph.
+- Adds active truck/customer memory helper.
 
-V8.3b LOGIN BYPASS + HARD HOME FIX:
-- Disables startup login/sign-in gate.
-- Forces Home first.
-- Keeps sign-in/auth for later settings phase, but does not block startup.
-- Replaces recovery/login failures with Home fallback.
-- Repeats startup recovery checks after DOMContentLoaded/load/hashchange/error.
+V8.7 AI PREVIEW WORKFLOW:
+- AI builds invoice/quote preview inside chat first.
+- User can review on screen before saving.
+- "Send to invoices" saves preview to Invoices.
+- "Send to quotes" saves preview to Quotes.
+- Preview has action buttons: Send to Invoices, Send to Quotes, Signature, Payment, Edit, Discard.
+- Built on V8.6 stable. No login/startup/router recovery patches.
 
-V8.3c HOME DATA REPAIR:
-- Repairs missing saved state fields before Home renders.
-- Ensures schedule/jobs/quotes/invoices/workorders/customers/parts/notes arrays exist.
-- Fixes currentRoute hardcoded home bug.
-- Makes Home rows defensive against old localStorage data.
-- Adds fallback Home if renderHome still fails.
-
-V8.3d ROUTE/BUTTON BINDING FIX:
-- Adds global delegated click handler for every [data-route] button.
-- Fixes bottom nav/cards not opening pages.
-- Adds route aliases: Repair -> Repair HUD, Business -> Dashboard, AI -> Brain.
-- Overrides setRoute/currentRoute after load.
-- Adds safe fallback route rendering if normal render crashes.
+V8.8 REAL AI BACKEND CONNECTIONS:
+- Adds Backend Connections page.
+- AI Endpoint / Key.
+- Web Search Endpoint / Key.
+- Vision Endpoint / Key.
+- OCR Endpoint / Key.
+- Parts Search Endpoint / Key.
+- RW AI chat calls backend AI when connected.
+- Web/parts questions route to web/parts endpoints when configured.
+- Quote/invoice preview workflow still works before saving to modules.
+NOTE: This frontend cannot answer literally anything by itself. Connect a real backend AI/search/vision service to unlock ChatGPT/Gemini/Google-like behavior.

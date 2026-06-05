@@ -1,277 +1,3 @@
-
-/* ===== V8.3d GLOBAL ROUTE/BUTTON FIX ===== */
-function rwdResolveRoute(route){
-  route = String(route || "home").replace("#","").toLowerCase();
-  const aliases = {
-    ai:"brain",
-    rwai:"brain",
-    quote:"quotes",
-    invoice:"invoices",
-    wo:"workorders",
-    workorder:"workorders",
-    repair:"repairhud",
-    business:"dashboard",
-    schedule:"schedule",
-    home:"home",
-    truck:"truck",
-    settings:"settings"
-  };
-  return aliases[route] || route || "home";
-}
-function rwdSafeRenderRoute(route){
-  route = rwdResolveRoute(route);
-  try{
-    if(route !== "brain" && route !== "ai"){
-      document.body.classList.remove("rw-ai-mode","ai-lock","ai-full-open");
-    }
-  }catch(e){}
-  try{
-    if(typeof render === "function"){
-      render(route);
-      return true;
-    }
-  }catch(e){
-    console.warn("main render failed", route, e);
-  }
-  try{
-    const fn = window["render" + route.charAt(0).toUpperCase() + route.slice(1)];
-    if(typeof fn === "function"){
-      fn();
-      return true;
-    }
-  }catch(e){}
-  try{
-    if(route==="home" && typeof rwdSafeRenderHome==="function") return rwdSafeRenderHome();
-    if(route==="home" && typeof renderHome==="function"){ renderHome(); return true; }
-    if(route==="settings" && typeof renderSettings==="function"){ renderSettings(); return true; }
-    if(route==="truck" && typeof renderTruck==="function"){ renderTruck(); return true; }
-    if(route==="quotes" && typeof renderQuotes==="function"){ renderQuotes(); return true; }
-    if(route==="invoices" && typeof renderInvoices==="function"){ renderInvoices(); return true; }
-    if(route==="workorders" && typeof renderWorkOrders==="function"){ renderWorkOrders(); return true; }
-    if(route==="brain" && typeof renderRW8Brain==="function"){ renderRW8Brain(); return true; }
-    if(route==="brain" && typeof renderBrainV72==="function"){ renderBrainV72(); return true; }
-    if(route==="repairhud" && typeof renderRepairHud==="function"){ renderRepairHud(); return true; }
-    if(route==="schedule" && typeof renderSchedule==="function"){ renderSchedule(); return true; }
-  }catch(e){
-    console.warn("fallback route failed", route, e);
-  }
-  try{
-    const screen=document.querySelector("#screen");
-    if(screen){
-      screen.innerHTML = `<div class="page-head"><button class="action-btn" data-route="home">← Back</button><h2>${route.toUpperCase()}</h2></div><section class="form-panel"><div class="output">This page is loading. Route fixed: ${route}</div></section>`;
-    }
-  }catch(e){}
-  return false;
-}
-window.rwdHardSetRoute = function(route){
-  route = rwdResolveRoute(route);
-  try{ history.replaceState(null,"","#"+route); }catch(e){ location.hash=route; }
-  setTimeout(()=>rwdSafeRenderRoute(route), 0);
-};
-document.addEventListener("click", function(e){
-  const el = e.target.closest("[data-route]");
-  if(!el) return;
-  e.preventDefault();
-  e.stopPropagation();
-  window.rwdHardSetRoute(el.getAttribute("data-route"));
-}, true);
-window.addEventListener("hashchange", function(){
-  const route = (location.hash || "#home").replace("#","");
-  setTimeout(()=>rwdSafeRenderRoute(route), 0);
-});
-window.addEventListener("load", function(){
-  setTimeout(()=>rwdSafeRenderRoute((location.hash || "#home").replace("#","")), 100);
-});
-
-
-/* ===== V8.3c HOME DATA REPAIR ===== */
-function rwdRepairState(){
-  try{
-    window.state = window.state || {};
-    state.settings = Object.assign({shop:"Rolling Wrench Diesel", phone:"260-502-6222", laborRate:135, serviceCall:250, tax:0, cardFee:0}, state.settings || {});
-    state.truck = Object.assign({unit:"No Active Truck", vin:"NONE", customer:"", engine:"Cummins X15", transmission:"", mileage:"", cpl:""}, state.truck || {});
-    state.jobs = state.jobs || {};
-    ["job1","job2","job3"].forEach((id,i)=>{
-      state.jobs[id] = Object.assign({name:`Job ${i+1}`, customer:"", seconds:0, baseSeconds:0, startTimestamp:null, running:false, saved:[], status:"READY"}, state.jobs[id] || {});
-    });
-    ["invoices","quotes","workorders","customers","schedule","parts","notes","pins","pm","trucks","notifications","files","repairMemory","aiConversations","pmRecords"].forEach(k=>{
-      if(!Array.isArray(state[k])) state[k]=[];
-    });
-    if(typeof saveState==="function") saveState();
-  }catch(e){
-    console.warn("rwdRepairState failed", e);
-  }
-}
-function rwdSafeRenderHome(){
-  try{
-    rwdRepairState();
-    if(typeof renderHome==="function"){
-      renderHome();
-      return true;
-    }
-  }catch(e){
-    console.error("Home render failed after repair", e);
-    const screen=document.querySelector("#screen");
-    if(screen){
-      screen.innerHTML = `
-        <section class="top-status-grid">
-          <article class="hero-card"><h3>Time Clock</h3><div class="big-time">00:00:00</div><small>READY</small><div class="money">$0.00</div><button class="hero-action" data-route="clock">Open Clock</button></article>
-          <article class="hero-card"><h3>Active Truck</h3><div class="truck-info-line"><span>Unit</span><b>No Active Truck</b></div><div class="truck-info-line"><span>VIN</span><b>NONE</b></div><div class="truck-info-line"><span>Engine</span><b>Cummins X15</b></div><button class="hero-action" data-route="truck">Truck Profile</button></article>
-          <article class="hero-card"><h3>System</h3><div class="ready-big">Ready</div><div class="system-sub">Home recovered</div><button class="hero-action" data-route="settings">Settings</button></article>
-        </section>
-        <div class="rwd-ai-bar clean-ai-bar" data-route="ai"><div class="ai-orb">RW</div><div class="ai-copy"><strong>Ask anything...</strong><span>Rolling Wrench AI</span></div></div>
-        <section class="module-grid">
-          <button class="module-card" data-route="truck"><span class="icon">🔎</span><b>VIN Lookup</b><small>Decode / save truck</small></button>
-          <button class="module-card" data-route="parts"><span class="icon">🔧</span><b>Parts Lookup</b><small>Parts + cross refs</small></button>
-          <button class="module-card" data-route="fault"><span class="icon">⚕</span><b>Fault Doctor</b><small>SPN/FMI workflow</small></button>
-          <button class="module-card" data-route="quotes"><span class="icon">▣</span><b>Smart Quotes</b><small>Build estimate</small></button>
-          <button class="module-card" data-route="invoices"><span class="icon">▥</span><b>Invoices</b><small>Paper bill</small></button>
-          <button class="module-card" data-route="settings"><span class="icon">⚙</span><b>Settings</b><small>Shop defaults</small></button>
-        </section>`;
-      if(typeof bindPageTools==="function") bindPageTools();
-      document.querySelectorAll("[data-route]").forEach(el=>{
-        el.onclick=()=>{ if(typeof setRoute==="function") setRoute(el.dataset.route); else location.hash=el.dataset.route; };
-      });
-      return true;
-    }
-  }
-  return false;
-}
-
-
-/* ===== V8.3b LOGIN BYPASS + HARD HOME FIX ===== */
-(function(){
-  window.RWD_DISABLE_STARTUP_LOGIN = true;
-  window.RWD_FORCE_HOME_FIRST = true;
-
-  function rwdSafeState(){
-    try{
-      window.state = window.state || {};
-      state.auth = state.auth || {};
-      state.auth.skipLogin = true;
-      state.auth.isSignedIn = true;
-      state.auth.user = state.auth.user || {name:"Rolling Wrench", role:"Owner/Admin"};
-      state.settings = state.settings || {};
-      state.truck = state.truck || {unit:"No Active Truck", vin:"NONE", engine:"Cummins X15", customer:""};
-      state.quotes = state.quotes || [];
-      state.invoices = state.invoices || [];
-      state.workorders = state.workorders || [];
-      state.customers = state.customers || [];
-      state.brainChats = state.brainChats || [];
-      if(typeof saveState === "function") saveState();
-    }catch(e){}
-  }
-
-  function hardHomeHtml(){
-    return `
-      <section class="top-cards">
-        <div class="dash-card">
-          <b>TIME CLOCK</b>
-          <h2>00:00:00</h2>
-          <small>READY</small>
-        </div>
-        <div class="dash-card">
-          <b>ACTIVE TRUCK</b>
-          <h2>No Active Truck</h2>
-          <small>Open Truck Profile</small>
-        </div>
-        <div class="dash-card">
-          <b>SYSTEM</b>
-          <h2>READY</h2>
-          <small>Local save active</small>
-        </div>
-      </section>
-
-      <section class="ai-entry" data-route="brain">
-        <b>Ask Rolling Wrench AI</b>
-        <small>Quotes • invoices • diagnostics • parts • OCR</small>
-      </section>
-
-      <section class="module-grid">
-        <button data-route="truck">TRUCK PROFILE</button>
-        <button data-route="brain">ASK AI</button>
-        <button data-route="quotes">SMART QUOTES</button>
-        <button data-route="invoices">INVOICES</button>
-        <button data-route="workorders">WORK ORDERS</button>
-        <button data-route="customers">CUSTOMERS</button>
-        <button data-route="memorylibrary">REPAIR MEMORY</button>
-        <button data-route="parts">PARTS</button>
-        <button data-route="settings">SETTINGS</button>
-      </section>
-
-      <section class="status-row">
-        <div class="status-pill">GPS<br><span>READY</span></div>
-        <div class="status-pill">CAMERA<br><span>READY</span></div>
-        <div class="status-pill">STORAGE<br><span>LOCAL</span></div>
-        <div class="status-pill">BUTTONS<br><span>PASS</span></div>
-      </section>
-    `;
-  }
-
-  window.rwdBypassLoginAndHome = function(){
-    rwdSafeState();
-    try{
-      document.body.classList.remove("rw-ai-mode","ai-lock","ai-full-open");
-      document.querySelectorAll(".login-gate,.auth-gate,.signin-gate,#loginGate,#authGate,#signinGate").forEach(el=>el.remove());
-    }catch(e){}
-
-    try{
-      if(location.hash==="" || location.hash==="#" || location.hash.toLowerCase().includes("login") || location.hash.toLowerCase().includes("signin") || location.hash.toLowerCase().includes("recovery")){
-        history.replaceState(null,"","#home");
-      }
-    }catch(e){}
-
-    const screen = document.querySelector("#screen");
-    if(!screen) return false;
-
-    let ok=false;
-    try{
-      if(typeof renderHome === "function"){
-        rwdSafeRenderHome();
-        ok=true;
-      }
-    }catch(e){
-      console.warn("renderHome failed, fallback home loaded", e);
-    }
-
-    const bodyText = document.body.innerText || "";
-    if(!ok || bodyText.includes("LOADING HOME") || bodyText.includes("Home did not render") || bodyText.includes("SIGN IN") || bodyText.includes("LOGIN") || screen.innerHTML.trim()===""){
-      screen.innerHTML = hardHomeHtml();
-      ok=true;
-    }
-
-    try{
-      if(typeof bindPageTools === "function") bindPageTools();
-      screen.querySelectorAll("[data-route]").forEach(el=>{
-        el.onclick=()=>{
-          const r=el.getAttribute("data-route");
-          if(typeof setRoute==="function") setRoute(r);
-          else location.hash=r;
-        };
-      });
-    }catch(e){}
-
-    return ok;
-  };
-
-  function repeatHome(){
-    setTimeout(window.rwdBypassLoginAndHome, 25);
-    setTimeout(window.rwdBypassLoginAndHome, 200);
-    setTimeout(window.rwdBypassLoginAndHome, 700);
-    setTimeout(window.rwdBypassLoginAndHome, 1500);
-  }
-
-  document.addEventListener("DOMContentLoaded", repeatHome);
-  window.addEventListener("load", repeatHome);
-  window.addEventListener("error", function(){ setTimeout(window.rwdBypassLoginAndHome, 50); });
-  window.addEventListener("hashchange", function(){
-    const h=(location.hash||"").toLowerCase();
-    if(h==="" || h==="#home" || h.includes("login") || h.includes("signin") || h.includes("recovery")){
-      setTimeout(window.rwdBypassLoginAndHome, 25);
-    }
-  });
-})();
-
 const $ = sel => document.querySelector(sel);
 const $$ = sel => Array.from(document.querySelectorAll(sel));
 const money = n => "$" + Number(n || 0).toFixed(2);
@@ -334,8 +60,568 @@ function bindPageTools(){
 }
 function panelOutput(text){ return `<div class="output">${text || ""}</div>`; }
 
+
+/* ===== V8.6 SAFE FEATURES ===== */
+function v86Ensure(){
+  if(typeof rwdV85NormalizeState === "function") rwdV85NormalizeState();
+  state.v86 = state.v86 || {};
+  state.v86.clock = Object.assign({seconds:0,running:false,startTs:null,sessions:[]}, state.v86.clock || {});
+  state.v86.quoteLinks = state.v86.quoteLinks || [];
+  state.repairMemory = Array.isArray(state.repairMemory) ? state.repairMemory : [];
+  state.schedule = Array.isArray(state.schedule) ? state.schedule : [];
+  state.customers = Array.isArray(state.customers) ? state.customers : [];
+  state.quotes = Array.isArray(state.quotes) ? state.quotes : [];
+  state.invoices = Array.isArray(state.invoices) ? state.invoices : [];
+}
+function v86Money(n){ return "$" + Number(n||0).toFixed(2); }
+function v86ClockSeconds(){
+  v86Ensure();
+  const c=state.v86.clock;
+  let s=Number(c.seconds||0);
+  if(c.running && c.startTs) s += Math.floor((Date.now()-Number(c.startTs))/1000);
+  return Math.max(0,s);
+}
+function v86Fmt(sec){
+  sec=Math.floor(sec||0);
+  const h=String(Math.floor(sec/3600)).padStart(2,"0");
+  const m=String(Math.floor(sec%3600/60)).padStart(2,"0");
+  const s=String(sec%60).padStart(2,"0");
+  return `${h}:${m}:${s}`;
+}
+function v86SaveActiveMemory(){
+  state.v86.activeTruck = Object.assign({}, state.truck||{});
+  if(state.truck && state.truck.customer){
+    const exists=(state.customers||[]).find(c=>(c.name||"")===state.truck.customer);
+    if(!exists) state.customers.unshift({name:state.truck.customer,phone:"",email:"",notes:"Created from active truck",date:new Date().toLocaleString()});
+  }
+  saveState();
+}
+function v86SignatureBlock(prefix){
+  return `<div class="v86-signature">
+    <b>Customer / Driver Signature</b>
+    <label>Printed Name<input id="${prefix}Signer" placeholder="Name"></label>
+    <canvas id="${prefix}Pad"></canvas>
+    <div class="v86-actions"><button id="${prefix}ClearSig">Clear</button><button class="primary" id="${prefix}SaveSig">Save Signature</button></div>
+    <div id="${prefix}SigPreview"></div>
+  </div>`;
+}
+function v86SetupSig(prefix){
+  const c=document.getElementById(prefix+"Pad"); if(!c) return;
+  const ctx=c.getContext("2d"); let down=false,last=null;
+  function fit(){ const r=c.getBoundingClientRect(); c.width=Math.max(300,Math.floor(r.width*devicePixelRatio)); c.height=Math.floor(170*devicePixelRatio); ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0); ctx.lineWidth=3; ctx.lineCap="round"; ctx.strokeStyle="#111923"; }
+  setTimeout(fit,50);
+  function p(e){const r=c.getBoundingClientRect(),t=e.touches?e.touches[0]:e;return{x:t.clientX-r.left,y:t.clientY-r.top};}
+  function start(e){e.preventDefault();down=true;last=p(e)}
+  function move(e){if(!down)return;e.preventDefault();const pt=p(e);ctx.beginPath();ctx.moveTo(last.x,last.y);ctx.lineTo(pt.x,pt.y);ctx.stroke();last=pt}
+  function stop(){down=false}
+  c.addEventListener("mousedown",start);c.addEventListener("mousemove",move);c.addEventListener("mouseup",stop);c.addEventListener("mouseleave",stop);
+  c.addEventListener("touchstart",start,{passive:false});c.addEventListener("touchmove",move,{passive:false});c.addEventListener("touchend",stop);
+  document.getElementById(prefix+"ClearSig").onclick=()=>{ctx.clearRect(0,0,c.width,c.height); state[prefix+"Signature"]=null; saveState(); document.getElementById(prefix+"SigPreview").innerHTML="";};
+  document.getElementById(prefix+"SaveSig").onclick=()=>{state[prefix+"Signature"]={data:c.toDataURL("image/png"),name:document.getElementById(prefix+"Signer").value,date:new Date().toLocaleString()}; saveState(); document.getElementById(prefix+"SigPreview").innerHTML=`<small>Saved ${state[prefix+"Signature"].date}</small><img src="${state[prefix+"Signature"].data}">`; if(typeof toast==="function") toast("Signature saved");};
+}
+function v86QuoteFromFields(){
+  const desc=document.getElementById("v86QuoteDesc")?.value || "Repair estimate";
+  const hours=Number(document.getElementById("v86QuoteHours")?.value || 0);
+  const rate=Number(document.getElementById("v86QuoteRate")?.value || state.settings?.laborRate || 135);
+  const parts=Number(document.getElementById("v86QuoteParts")?.value || 0);
+  const call=Number(document.getElementById("v86QuoteCall")?.value || state.settings?.serviceCall || 250);
+  const supplies=Number(document.getElementById("v86QuoteSupplies")?.value || 0);
+  const total=hours*rate+parts+call+supplies;
+  return {id:Date.now(),customer:document.getElementById("v86QuoteCustomer")?.value || state.truck?.customer || "",truck:document.getElementById("v86QuoteTruck")?.value || state.truck?.unit || "",desc,hours,rate,parts,call,supplies,total,date:new Date().toLocaleString(),status:"Draft",signature:state.v86QuoteSignature||null};
+}
+function v86RenderQuotePaper(q){
+  return `<section class="v86-paper"><h2>ROLLING WRENCH DIESEL</h2><p>260-502-6222 • Mobile Diesel Repair</p><hr><h2>QUOTE</h2><p>${q.date||""}</p><p><b>Customer:</b> ${q.customer||"Customer"}</p><p><b>Truck:</b> ${q.truck||"Truck"}</p><p><b>Job:</b> ${q.desc||""}</p><div class="v86-line head"><b>Description</b><b>Qty/Rate</b><b>Total</b></div><div class="v86-line"><span>Labor</span><span>${q.hours||0} hrs @ ${v86Money(q.rate||0)}</span><span>${v86Money((q.hours||0)*(q.rate||0))}</span></div><div class="v86-line"><span>Service Call</span><span>1</span><span>${v86Money(q.call||0)}</span></div><div class="v86-line"><span>Parts</span><span>1</span><span>${v86Money(q.parts||0)}</span></div><div class="v86-line"><span>Supplies / Fees</span><span>1</span><span>${v86Money(q.supplies||0)}</span></div><div class="total">Estimated Total ${v86Money(q.total||0)}</div><div class="disclaimer"><b>Estimate Disclaimer:</b> Price may vary due to additional labor, hidden damage, seized hardware, parts availability, taxes, fees, and extra approved work.</div>${q.signature?.data?`<div class="v86-signature"><b>Signed By:</b> ${q.signature.name||""}<br><small>${q.signature.date||""}</small><img src="${q.signature.data}"></div>`:""}</section>`;
+}
+
+/* ===== V8.7 AI PREVIEW WORKFLOW ===== */
+function v87Ensure(){
+  if(typeof v86Ensure === "function") v86Ensure();
+  state.v87 = state.v87 || {};
+  state.v87.pending = state.v87.pending || null;
+  state.brainChats = Array.isArray(state.brainChats) ? state.brainChats : [];
+}
+function v87Money(n){ return "$" + Number(n||0).toFixed(2); }
+function v87Intent(text){
+  const q=String(text||"").toLowerCase();
+  if(q.includes("invoice") || q.includes("bill")) return "invoice";
+  if(q.includes("quote") || q.includes("estimate")) return "quote";
+  if(q.includes("send to invoice") || q.includes("save to invoice")) return "toInvoice";
+  if(q.includes("send to quote") || q.includes("save to quote")) return "toQuote";
+  if(q.includes("signature")) return "signature";
+  if(q.includes("payment")) return "payment";
+  return "general";
+}
+function v87BuildPreview(text,type){
+  const q=String(text||"");
+  const low=q.toLowerCase();
+  let hours=2.0;
+  let title=type==="quote" ? "Quote Preview" : "Invoice Preview";
+  let parts="Parts/materials to verify";
+  if(low.includes("clutch")){hours=11.5; title=type==="quote"?"Clutch Quote Preview":"Clutch Invoice Preview"; parts="Clutch kit, pilot bearing, release bearing, flywheel inspection, shop supplies";}
+  if(low.includes("water pump")){hours=4.0; title=type==="quote"?"Water Pump Quote Preview":"Water Pump Invoice Preview"; parts="Water pump, belt if needed, coolant, gaskets/seals, shop supplies";}
+  if(low.includes("wheel seal")){hours=2.5; title=type==="quote"?"Wheel Seal Quote Preview":"Wheel Seal Invoice Preview"; parts="Wheel seal, hub oil, brake clean, shop supplies";}
+  const rate=Number(state.settings?.laborRate||135);
+  const service=Number(state.settings?.serviceCall||250);
+  const partsTotal=0;
+  const supplies=type==="invoice" ? 25 : 25;
+  const total=hours*rate+service+partsTotal+supplies;
+  return {
+    id:Date.now(),
+    type,
+    title,
+    customer:state.truck?.customer || "",
+    truck:state.truck?.unit || "",
+    vin:state.truck?.vin || "",
+    engine:state.truck?.engine || "",
+    work:q,
+    hours,
+    rate,
+    service,
+    parts,
+    partsTotal,
+    supplies,
+    total,
+    date:new Date().toLocaleString(),
+    status:"Preview"
+  };
+}
+function v87PreviewHtml(p){
+  return `<div class="ai-preview-card">
+    <h3>${p.title}</h3>
+    <div class="ai-preview-paper">
+      <h2>ROLLING WRENCH DIESEL</h2>
+      <small>260-502-6222 • Mobile Diesel Repair</small>
+      <hr>
+      <p><b>Customer:</b> ${p.customer || "Add customer"}</p>
+      <p><b>Truck:</b> ${p.truck || "Add truck"} ${p.vin || ""}</p>
+      <p><b>Engine:</b> ${p.engine || "Verify engine"}</p>
+      <p><b>Work:</b> ${p.work}</p>
+      <div class="row"><span>Labor ${p.hours} hrs @ ${v87Money(p.rate)}/hr</span><b>${v87Money(p.hours*p.rate)}</b></div>
+      <div class="row"><span>Service Call</span><b>${v87Money(p.service)}</b></div>
+      <div class="row"><span>Parts / Materials<br><small>${p.parts}</small></span><b>${v87Money(p.partsTotal)}</b></div>
+      <div class="row"><span>Supplies / Fees</span><b>${v87Money(p.supplies)}</b></div>
+      <div class="total">${p.type==="quote" ? "Estimated Total" : "Total Due"} ${v87Money(p.total)}</div>
+      <p><small><b>Note:</b> Review before sending. Price may vary due to added labor, hidden damage, parts availability, taxes/fees, or approved extra work.</small></p>
+    </div>
+    <div class="ai-preview-actions">
+      <button class="primary" data-v87-action="toInvoice">Send to Invoices</button>
+      <button class="primary" data-v87-action="toQuote">Send to Quotes</button>
+      <button data-v87-action="signature">Send for Signature</button>
+      <button data-v87-action="payment">Send for Payment</button>
+      <button data-v87-action="edit">Edit</button>
+      <button data-v87-action="discard">Discard</button>
+    </div>
+  </div>`;
+}
+function v87Push(role,text,kind,meta){
+  state.brainChats = state.brainChats || [];
+  state.brainChats.push({role,text,kind:kind||"",meta:meta||null,date:new Date().toLocaleString()});
+  saveState();
+}
+function v87SavePending(target){
+  v87Ensure();
+  const p=state.v87.pending;
+  if(!p) return false;
+  if(target==="invoice"){
+    state.invoices.unshift({customer:p.customer,truck:p.truck,work:p.work,parts:p.parts,total:p.total,date:p.date,fromAI:true,status:"Draft"});
+    saveState();
+    return true;
+  }
+  if(target==="quote"){
+    state.quotes.unshift({customer:p.customer,truck:p.truck,desc:p.work,hours:p.hours,rate:p.rate,parts:p.parts,call:p.service,supplies:p.supplies,total:p.total,date:p.date,fromAI:true,status:"Draft"});
+    saveState();
+    return true;
+  }
+  return false;
+}
+function v87RunAI(text){
+  v87Ensure();
+  text=String(text||"").trim();
+  if(!text) return;
+  const q=text.toLowerCase();
+  if(["clear","clear chat","new chat"].includes(q)){
+    state.brainChats=[]; state.v87.pending=null; saveState(); renderV87AI(); return;
+  }
+  if(["send to invoices","send to invoice","save to invoices","save to invoice"].includes(q)){
+    const ok=v87SavePending("invoice");
+    v87Push("ai", ok ? "Done. I sent that preview to Invoices." : "No preview found. Build an invoice first.");
+    renderV87AI(); return;
+  }
+  if(["send to quotes","send to quote","save to quotes","save to quote"].includes(q)){
+    const ok=v87SavePending("quote");
+    v87Push("ai", ok ? "Done. I sent that preview to Quotes." : "No preview found. Build a quote first.");
+    renderV87AI(); return;
+  }
+  v87Push("user",text);
+  const intent=v87Intent(text);
+  if(intent==="invoice" || intent==="quote"){
+    const p=v87BuildPreview(text,intent);
+    state.v87.pending=p;
+    v87Push("ai",`I built a ${intent} preview. Review it on screen first. If you like it, say “send to invoices” or “send to quotes”.`);
+    v87Push("ai","preview","preview",p);
+  }else{
+    v87Push("ai","I can answer questions, build an invoice preview, build a quote preview, then send it to Invoices or Quotes when you approve it.");
+  }
+  saveState();
+  renderV87AI();
+}
+
+/* ===== V8.8 REAL AI BACKEND CONNECTIONS ===== */
+function v88Ensure(){
+  if(typeof v87Ensure === "function") v87Ensure();
+  state.backend = Object.assign({
+    aiEndpoint:"",
+    aiKey:"",
+    webEndpoint:"",
+    webKey:"",
+    visionEndpoint:"",
+    visionKey:"",
+    ocrEndpoint:"",
+    ocrKey:"",
+    partsEndpoint:"",
+    partsKey:"",
+    supabaseUrl: state.backend?.supabaseUrl || "",
+    supabaseAnon: state.backend?.supabaseAnon || ""
+  }, state.backend || {});
+  state.v88 = state.v88 || {lastBackendTest:"", lastTool:"local"};
+}
+function v88Has(url){ return !!String(url||"").trim(); }
+async function v88Post(url,key,payload){
+  const headers={"Content-Type":"application/json"};
+  if(key) headers["Authorization"]="Bearer "+key;
+  const res = await fetch(url,{method:"POST",headers,body:JSON.stringify(payload)});
+  const text = await res.text();
+  let data;
+  try{ data=JSON.parse(text); }catch(e){ data={text}; }
+  if(!res.ok) throw new Error(data.error || data.message || text || ("HTTP "+res.status));
+  return data;
+}
+function v88Context(){
+  return {
+    truck:state.truck||{},
+    settings:state.settings||{},
+    pending:state.v87?.pending||null,
+    recentQuotes:(state.quotes||[]).slice(-5),
+    recentInvoices:(state.invoices||[]).slice(-5),
+    repairMemory:(state.repairMemory||[]).slice(0,10)
+  };
+}
+function v88NeedWeb(text){
+  const q=String(text||"").toLowerCase();
+  return q.includes("near me") || q.includes("price") || q.includes("current") || q.includes("today") || q.includes("this year") || q.includes("find me") || q.includes("supplier") || q.includes("where can i buy") || q.includes("who won");
+}
+function v88NeedParts(text){
+  const q=String(text||"").toLowerCase();
+  return q.includes("part") || q.includes("water pump") || q.includes("belt") || q.includes("clutch") || q.includes("sensor") || q.includes("filter") || q.includes("supplier");
+}
+async function v88AnswerAnything(text, files){
+  v88Ensure();
+  const ctx=v88Context();
+  const q=String(text||"");
+  const payload={prompt:q, question:q, context:ctx, files:files||[], instruction:"Answer anything like ChatGPT/Gemini/Google. If user asks for quote/invoice, return preview data plus normal answer. If question needs current information, use web/search endpoint if available."};
+
+  if(v88NeedParts(q) && v88Has(state.backend.partsEndpoint)){
+    state.v88.lastTool="parts";
+    const data=await v88Post(state.backend.partsEndpoint,state.backend.partsKey,payload);
+    return data.answer || data.text || data.message || JSON.stringify(data,null,2);
+  }
+  if(v88NeedWeb(q) && v88Has(state.backend.webEndpoint)){
+    state.v88.lastTool="web";
+    const data=await v88Post(state.backend.webEndpoint,state.backend.webKey,payload);
+    return data.answer || data.text || data.message || JSON.stringify(data,null,2);
+  }
+  if(v88Has(state.backend.aiEndpoint)){
+    state.v88.lastTool="ai";
+    const data=await v88Post(state.backend.aiEndpoint,state.backend.aiKey,payload);
+    return data.answer || data.text || data.message || JSON.stringify(data,null,2);
+  }
+  state.v88.lastTool="local";
+  return "";
+}
+function v88LocalAnything(text){
+  const q=String(text||"").toLowerCase();
+  if(q.includes("low boost")){
+    return `Low boost on a Cummins X15 is commonly caused by:
+1. Charge air cooler leak or boot/clamp leak
+2. Exhaust leak before turbo
+3. VGT actuator/turbo vane issue
+4. Bad boost/MAP sensor reading
+5. Intake restriction
+6. EGR valve stuck open
+7. Fuel restriction/low fuel delivery
+8. Derate or aftertreatment restriction
+
+Checks:
+- Check boost under load
+- Pressure test CAC
+- Inspect boots for oil tracks/splits
+- Run VGT sweep
+- Compare commanded vs actual turbo position
+- Check codes and derate status`;
+  }
+  if(q.includes("invoice")) return "I can build the invoice preview here first. Tell me the work performed, labor time, parts, customer, and truck.";
+  if(q.includes("quote")) return "I can build the quote preview here first. Tell me the job, truck, customer, labor/parts if known.";
+  return "Backend AI is not connected yet. I can still build quotes/invoices and answer saved diesel fallback questions, but 'answer anything' needs the AI/Web endpoint saved in Backend Connections.";
+}
+async function v88RunAI(text){
+  v88Ensure();
+  text=String(text||"").trim();
+  if(!text) return;
+  const lower=text.toLowerCase();
+  if(["clear","clear chat","new chat"].includes(lower)){
+    state.brainChats=[]; state.v87.pending=null; saveState(); renderV88AI(); return;
+  }
+  if(["send to invoices","send to invoice","save to invoices","save to invoice"].includes(lower)){
+    const ok=v87SavePending("invoice");
+    v87Push("ai", ok ? "Done. I sent that preview to Invoices." : "No preview found. Build an invoice first.");
+    renderV88AI(); return;
+  }
+  if(["send to quotes","send to quote","save to quotes","save to quote"].includes(lower)){
+    const ok=v87SavePending("quote");
+    v87Push("ai", ok ? "Done. I sent that preview to Quotes." : "No preview found. Build a quote first.");
+    renderV88AI(); return;
+  }
+  v87Push("user",text);
+  const intent=v87Intent(text);
+  if(intent==="invoice" || intent==="quote"){
+    const p=v87BuildPreview(text,intent);
+    state.v87.pending=p;
+    v87Push("ai",`I built a ${intent} preview. Review it on screen first. If you like it, say “send to invoices” or “send to quotes”.`);
+    v87Push("ai","preview","preview",p);
+    saveState(); renderV88AI(); return;
+  }
+  try{
+    const live=await v88AnswerAnything(text);
+    v87Push("ai", live || v88LocalAnything(text));
+  }catch(e){
+    v87Push("ai", v88LocalAnything(text)+"\n\nBackend error: "+e.message);
+  }
+  saveState();
+  renderV88AI();
+}
+function renderV88AI(){
+  v88Ensure();
+  document.body.classList.add("rw-ai-mode");
+  const ctx=`${state.truck?.customer||"No customer"} • ${state.truck?.unit||"No truck"} • ${state.truck?.engine||"Engine unknown"}`;
+  const live = v88Has(state.backend.aiEndpoint) ? `<span class="ai-live-badge">AI Connected</span>` : `<span class="ai-offline-badge">Local / Setup Needed</span>`;
+  $("#screen").innerHTML = `<section class="rw8-shell">
+    <div class="rw8-head"><div class="rw8-brand"><div class="rw8-logo">RW</div><div><b>Rolling Wrench AI</b><small>${ctx}</small></div></div><div>${live}<button class="clear" id="v88Clear">Clear</button><button id="v88Close">Close</button></div></div>
+    <div class="rw8-thread" id="v88Thread">
+      <div class="rw8-chips">
+        <button data-v88-chip="Build me an invoice for replacing water pump and belt">Invoice Preview</button>
+        <button data-v88-chip="Build me a quote for clutch replacement on a 2014 Peterbilt ISX">Quote Preview</button>
+        <button data-v88-chip="What causes low boost on a Cummins X15?">Diesel Question</button>
+        <button data-v88-chip="Who won the Indy 500 this year?">General / Web</button>
+        <button data-route="vision">Photo</button>
+        <button data-route="backendconnections">Backend</button>
+      </div>
+      ${(state.brainChats||[]).map(m=>{
+        if(m.kind==="preview") return v87PreviewHtml(m.meta);
+        return `<div class="msg ${m.role==="user"?"user":"ai"}"><b>${m.role==="user"?"You":"RW AI"}</b>${String(m.text||"").replace(/\\n/g,"\n")}</div>`;
+      }).join("") || `<div class="msg ai"><b>RW AI</b>Ask me anything. I’ll answer general questions through backend AI/Web when connected, and I’ll preview invoices/quotes before saving them.</div>`}
+    </div>
+    <div class="rw8-compose"><button class="plus" id="v88Plus">+</button><div class="inputbox"><input id="v88Input" placeholder="Ask Rolling Wrench AI anything..."><button class="mic" id="v88Mic">🎙</button></div><button class="sendbtn" id="v88Send">➤</button></div>
+  </section>`;
+  bindPageTools && bindPageTools();
+  const th=$("#v88Thread"); if(th) th.scrollTop=th.scrollHeight;
+  $("#v88Send").onclick=()=>v88RunAI($("#v88Input").value);
+  $("#v88Input").onkeydown=e=>{if(e.key==="Enter")v88RunAI($("#v88Input").value);};
+  $("#v88Clear").onclick=()=>{state.brainChats=[];state.v87.pending=null;saveState();renderV88AI();};
+  $("#v88Close").onclick=()=>{document.body.classList.remove("rw-ai-mode");setRoute("home");};
+  $("#v88Plus").onclick=()=>setRoute("vision");
+  $("#v88Mic").onclick=()=>{ if(typeof startVoiceToField==="function") startVoiceToField("v88Input"); else $("#v88Input").focus(); };
+  $$("[data-v88-chip]").forEach(b=>b.onclick=()=>v88RunAI(b.dataset.v88Chip));
+  $$("[data-v87-action]").forEach(b=>b.onclick=()=>{
+    const a=b.dataset.v87Action;
+    if(a==="toInvoice"){v87SavePending("invoice");saveState();setRoute("invoices");}
+    if(a==="toQuote"){v87SavePending("quote");saveState();setRoute("quotes");}
+    if(a==="signature"){v87SavePending(state.v87.pending?.type==="quote"?"quote":"invoice");saveState();setRoute(state.v87.pending?.type==="quote"?"quotes":"invoices");}
+    if(a==="payment"){v87SavePending("invoice");saveState();setRoute("invoices");}
+    if(a==="edit"){v87Push("ai","Tell me what to change, like: add 2 hours labor, remove service call, or change customer name.");saveState();renderV88AI();}
+    if(a==="discard"){state.v87.pending=null;v87Push("ai","Preview discarded.");saveState();renderV88AI();}
+  });
+}
+function renderBackendConnections(){
+  v88Ensure();
+  $("#screen").innerHTML = `${pageHead("Backend Connections","saveBackendConnections")}
+  <section class="backend-box form-grid">
+    <h3>Answer Anything AI</h3>
+    <small>Connect your real AI backend here. This is what lets RW AI answer anything like ChatGPT/Gemini.</small>
+    <label>AI Endpoint<input id="v88AiEndpoint" value="${state.backend.aiEndpoint||""}" placeholder="https://your-backend.com/ai"></label>
+    <label>AI Key<input id="v88AiKey" value="${state.backend.aiKey||""}" placeholder="optional"></label>
+  </section>
+  <section class="backend-box form-grid">
+    <h3>Google/Web Search</h3>
+    <small>Used when the question needs current info, suppliers, prices, news, who won, near me, etc.</small>
+    <label>Web Search Endpoint<input id="v88WebEndpoint" value="${state.backend.webEndpoint||""}" placeholder="https://your-backend.com/search"></label>
+    <label>Web Search Key<input id="v88WebKey" value="${state.backend.webKey||""}"></label>
+  </section>
+  <section class="backend-box form-grid">
+    <h3>Photo / Vision / OCR</h3>
+    <small>Used for part photos, VIN plates, invoices, fault screens, documents.</small>
+    <label>Vision Endpoint<input id="v88VisionEndpoint" value="${state.backend.visionEndpoint||""}" placeholder="https://your-backend.com/vision"></label>
+    <label>Vision Key<input id="v88VisionKey" value="${state.backend.visionKey||""}"></label>
+    <label>OCR Endpoint<input id="v88OcrEndpoint" value="${state.backend.ocrEndpoint||""}" placeholder="https://your-backend.com/ocr"></label>
+    <label>OCR Key<input id="v88OcrKey" value="${state.backend.ocrKey||""}"></label>
+  </section>
+  <section class="backend-box form-grid">
+    <h3>Parts Search</h3>
+    <small>Used for diesel/gas parts, suppliers, cross references, local price checks.</small>
+    <label>Parts Endpoint<input id="v88PartsEndpoint" value="${state.backend.partsEndpoint||""}" placeholder="https://your-backend.com/parts"></label>
+    <label>Parts Key<input id="v88PartsKey" value="${state.backend.partsKey||""}"></label>
+  </section>
+  <section class="backend-box">
+    <h3>Status</h3>
+    <p><span class="backend-status-dot ${v88Has(state.backend.aiEndpoint)?"ok":"bad"}"></span>AI Backend</p>
+    <p><span class="backend-status-dot ${v88Has(state.backend.webEndpoint)?"ok":"bad"}"></span>Web Search</p>
+    <p><span class="backend-status-dot ${v88Has(state.backend.visionEndpoint)?"ok":"bad"}"></span>Vision</p>
+    <p><span class="backend-status-dot ${v88Has(state.backend.partsEndpoint)?"ok":"bad"}"></span>Parts</p>
+    <div class="backend-test-row"><label>Test Question<input id="v88TestQuestion" value="What causes low boost on a Cummins X15?"></label><button class="v86-btn primary" id="v88TestBackend">Test</button></div>
+    <div class="backend-output" id="v88BackendOutput">${state.v88.lastBackendTest||"No test run yet."}</div>
+  </section>`;
+  bindPageTools && bindPageTools();
+  $("#saveBackendConnections").onclick=()=>{
+    state.backend.aiEndpoint=$("#v88AiEndpoint").value; state.backend.aiKey=$("#v88AiKey").value;
+    state.backend.webEndpoint=$("#v88WebEndpoint").value; state.backend.webKey=$("#v88WebKey").value;
+    state.backend.visionEndpoint=$("#v88VisionEndpoint").value; state.backend.visionKey=$("#v88VisionKey").value;
+    state.backend.ocrEndpoint=$("#v88OcrEndpoint").value; state.backend.ocrKey=$("#v88OcrKey").value;
+    state.backend.partsEndpoint=$("#v88PartsEndpoint").value; state.backend.partsKey=$("#v88PartsKey").value;
+    saveState(); if(typeof toast==="function") toast("Backend saved"); renderBackendConnections();
+  };
+  $("#v88TestBackend").onclick=async()=>{
+    $("#v88BackendOutput").textContent="Testing...";
+    try{
+      const ans=await v88AnswerAnything($("#v88TestQuestion").value);
+      state.v88.lastBackendTest=ans||v88LocalAnything($("#v88TestQuestion").value);
+      $("#v88BackendOutput").textContent=state.v88.lastBackendTest;
+      saveState();
+    }catch(e){
+      state.v88.lastBackendTest="Backend test failed: "+e.message;
+      $("#v88BackendOutput").textContent=state.v88.lastBackendTest;
+      saveState();
+    }
+  };
+}
+
+function renderV87AI(){
+  v87Ensure();
+  document.body.classList.add("rw-ai-mode");
+  const ctx=`${state.truck?.customer||"No customer"} • ${state.truck?.unit||"No truck"} • ${state.truck?.engine||"Engine unknown"}`;
+  $("#screen").innerHTML = `<section class="rw8-shell">
+    <div class="rw8-head"><div class="rw8-brand"><div class="rw8-logo">RW</div><div><b>Rolling Wrench AI</b><small>${ctx}</small></div></div><div><button class="clear" id="v87Clear">Clear</button><button id="v87Close">Close</button></div></div>
+    <div class="rw8-thread" id="v87Thread">
+      <div class="rw8-chips">
+        <button data-v87-chip="Build me an invoice for replacing water pump and belt">Invoice Preview</button>
+        <button data-v87-chip="Build me a quote for clutch replacement on a 2014 Peterbilt ISX">Quote Preview</button>
+        <button data-v87-chip="What causes low boost on a Cummins X15?">Ask Anything</button>
+        <button data-route="vision">Photo</button>
+      </div>
+      ${(state.brainChats||[]).map(m=>{
+        if(m.kind==="preview") return v87PreviewHtml(m.meta);
+        return `<div class="msg ${m.role==="user"?"user":"ai"}"><b>${m.role==="user"?"You":"RW AI"}</b>${String(m.text||"").replace(/\\n/g,"\n")}</div>`;
+      }).join("") || `<div class="msg ai"><b>RW AI</b>Ask me to build an invoice or quote. I’ll show it here first, then you choose where to send it.</div>`}
+    </div>
+    <div class="rw8-compose"><button class="plus" id="v87Plus">+</button><div class="inputbox"><input id="v87Input" placeholder="Ask Rolling Wrench AI anything..."><button class="mic">🎙</button></div><button class="sendbtn" id="v87Send">➤</button></div>
+  </section>`;
+  bindPageTools && bindPageTools();
+  const th=$("#v87Thread"); if(th) th.scrollTop=th.scrollHeight;
+  $("#v87Send").onclick=()=>v87RunAI($("#v87Input").value);
+  $("#v87Input").onkeydown=e=>{if(e.key==="Enter")v87RunAI($("#v87Input").value);};
+  $("#v87Clear").onclick=()=>{state.brainChats=[];state.v87.pending=null;saveState();renderV87AI();};
+  $("#v87Close").onclick=()=>{document.body.classList.remove("rw-ai-mode");setRoute("home");};
+  $("#v87Plus").onclick=()=>setRoute("vision");
+  $$("[data-v87-chip]").forEach(b=>b.onclick=()=>v87RunAI(b.dataset.v87Chip));
+  $$("[data-v87-action]").forEach(b=>b.onclick=()=>{
+    const a=b.dataset.v87Action;
+    if(a==="toInvoice"){v87SavePending("invoice");saveState();setRoute("invoices");}
+    if(a==="toQuote"){v87SavePending("quote");saveState();setRoute("quotes");}
+    if(a==="signature"){v87SavePending(state.v87.pending?.type==="quote"?"quote":"invoice");saveState();setRoute(state.v87.pending?.type==="quote"?"quotes":"invoices");}
+    if(a==="payment"){v87SavePending("invoice");saveState();setRoute("invoices");}
+    if(a==="edit"){v87Push("ai","Tell me what to change, like: add 2 hours labor, remove service call, or change customer name.");saveState();renderV87AI();}
+    if(a==="discard"){state.v87.pending=null;v87Push("ai","Preview discarded.");saveState();renderV87AI();}
+  });
+}
+
+function renderV86Quotes(){
+  v86Ensure();
+  $("#screen").innerHTML = `${pageHead("V8.6 Smart Quotes","v86SaveQuote")}
+  <section class="v86-card form-grid">
+    <label>Customer<input id="v86QuoteCustomer" value="${state.truck?.customer||""}"></label>
+    <label>Truck<input id="v86QuoteTruck" value="${state.truck?.unit||""} ${state.truck?.vin||""}"></label>
+    <label>Job Description<textarea id="v86QuoteDesc" placeholder="Clutch replacement, water pump, wheel seal..."></textarea></label>
+    <div class="v86-grid"><label>Hours<input id="v86QuoteHours" type="number" step=".1" value="3"></label><label>Rate<input id="v86QuoteRate" type="number" value="${state.settings?.laborRate||135}"></label></div>
+    <div class="v86-grid"><label>Service Call<input id="v86QuoteCall" type="number" value="${state.settings?.serviceCall||250}"></label><label>Parts<input id="v86QuoteParts" type="number" value="0"></label></div>
+    <label>Supplies / Fees<input id="v86QuoteSupplies" type="number" value="25"></label>
+    <div class="v86-actions"><button id="v86AiQuote">AI Fill</button><button class="primary" id="v86PreviewQuote">Preview</button></div>
+    ${v86SignatureBlock("v86Quote")}
+    <div id="v86QuotePreview"></div>
+  </section>
+  <section class="v86-card"><h3>Saved Quotes</h3>${state.quotes.length?state.quotes.slice().reverse().map(v86RenderQuotePaper).join(""):"<p>No saved quotes yet.</p>"}</section>`;
+  bindPageTools && bindPageTools();
+  v86SetupSig("v86Quote");
+  document.getElementById("v86AiQuote").onclick=()=>{const t=document.getElementById("v86QuoteDesc").value.toLowerCase(); if(t.includes("clutch")){v86QuoteHours.value=11.5;v86QuoteSupplies.value=45;} if(t.includes("water pump")){v86QuoteHours.value=4;v86QuoteSupplies.value=35;} if(t.includes("wheel seal")){v86QuoteHours.value=2.5;v86QuoteSupplies.value=25;} if(typeof toast==="function") toast("AI filled quote");};
+  document.getElementById("v86PreviewQuote").onclick=()=>{document.getElementById("v86QuotePreview").innerHTML=v86RenderQuotePaper(v86QuoteFromFields());};
+  document.getElementById("v86SaveQuote").onclick=()=>{const q=v86QuoteFromFields(); state.quotes.push(q); state.v86.quoteLinks.push({id:q.id,status:"Draft",date:q.date,customer:q.customer}); v86SaveActiveMemory(); saveState(); if(typeof toast==="function") toast("Quote saved"); renderV86Quotes();};
+}
+function renderV86Memory(){
+  v86Ensure();
+  $("#screen").innerHTML = `${pageHead("Repair Memory","v86SaveMemory")}
+  <section class="v86-card form-grid">
+    <label>Search<input id="v86MemSearch" placeholder="Search fault, engine, part, customer..."></label>
+    <label>Problem<textarea id="v86MemProblem"></textarea></label>
+    <label>Cause<textarea id="v86MemCause"></textarea></label>
+    <label>Correction<textarea id="v86MemCorrection"></textarea></label>
+    <label>Keywords<input id="v86MemKeywords" placeholder="X15, SPN, low boost, water pump"></label>
+  </section>
+  <section class="v86-card"><h3>Saved Memories</h3><div id="v86MemoryList"></div></section>`;
+  bindPageTools && bindPageTools();
+  function draw(){const q=(v86MemSearch.value||"").toLowerCase();v86MemoryList.innerHTML=(state.repairMemory||[]).filter(m=>JSON.stringify(m).toLowerCase().includes(q)).map((m,i)=>`<div class="v86-memory-item"><b>${m.problem||m.title||"Repair Memory"}</b><small>Cause: ${m.cause||""}\nCorrection: ${m.correction||""}\nKeywords: ${m.keywords||""}</small><div class="v86-actions"><button onclick="state.repairMemory.splice(${i},1);saveState();renderV86Memory()">Delete</button></div></div>`).join("")||"<p>No repair memories.</p>";}
+  v86MemSearch.oninput=draw; draw();
+  v86SaveMemory.onclick=()=>{state.repairMemory.unshift({id:Date.now(),problem:v86MemProblem.value,cause:v86MemCause.value,correction:v86MemCorrection.value,keywords:v86MemKeywords.value,truck:state.truck,date:new Date().toLocaleString()});saveState(); if(typeof toast==="function") toast("Memory saved"); renderV86Memory();};
+}
+function renderV86Clock(){
+  v86Ensure();
+  const c=state.v86.clock;
+  $("#screen").innerHTML = `${pageHead("Time Clock","v86SaveClock")}
+  <section class="v86-card">
+    <div class="v86-clock-time" id="v86ClockTime">${v86Fmt(v86ClockSeconds())}</div>
+    <div class="v86-actions"><button class="primary" id="v86StartClock">Start</button><button id="v86PauseClock">Pause</button><button id="v86StopClock">Stop</button><button id="v86ClearClock">Clear</button></div>
+    <p class="muted">Clock saves between app restarts.</p>
+  </section>
+  <section class="v86-card"><h3>Saved Sessions</h3>${(c.sessions||[]).map(s=>`<div class="v86-memory-item"><b>${v86Fmt(s.seconds)}</b><small>${s.date} • ${v86Money((s.seconds/3600)*(state.settings?.laborRate||135))}</small></div>`).join("")||"<p>No saved sessions.</p>"}</section>`;
+  bindPageTools && bindPageTools();
+  v86StartClock.onclick=()=>{v86Ensure();const c=state.v86.clock;if(!c.running){c.running=true;c.startTs=Date.now();saveState();}renderV86Clock();};
+  v86PauseClock.onclick=()=>{const c=state.v86.clock;c.seconds=v86ClockSeconds();c.running=false;c.startTs=null;saveState();renderV86Clock();};
+  v86StopClock.onclick=()=>{const c=state.v86.clock;const s=v86ClockSeconds();c.sessions.unshift({seconds:s,date:new Date().toLocaleString()});c.seconds=0;c.running=false;c.startTs=null;saveState();renderV86Clock();};
+  v86ClearClock.onclick=()=>{state.v86.clock={seconds:0,running:false,startTs:null,sessions:[]};saveState();renderV86Clock();};
+  v86SaveClock.onclick=()=>{const c=state.v86.clock;const s=v86ClockSeconds();c.sessions.unshift({seconds:s,date:new Date().toLocaleString()});c.seconds=s;c.running=false;c.startTs=null;saveState(); if(typeof toast==="function") toast("Clock saved"); renderV86Clock();};
+  setTimeout(()=>{ if(location.hash.includes("clock") || document.getElementById("v86ClockTime")){ const el=document.getElementById("v86ClockTime"); if(el) el.textContent=v86Fmt(v86ClockSeconds()); }},500);
+}
+function renderV86Schedule(){
+  v86Ensure();
+  $("#screen").innerHTML = `${pageHead("Schedule Board","v86SaveSchedule")}
+  <section class="v86-card form-grid">
+    <div class="v86-grid"><label>Date<input id="v86SchedDate" type="date"></label><label>Time<input id="v86SchedTime" type="time"></label></div>
+    <label>Customer<input id="v86SchedCustomer" value="${state.truck?.customer||""}"></label>
+    <label>Job<input id="v86SchedJob" placeholder="PM, roadside, clutch, brakes..."></label>
+    <label>Location<input id="v86SchedLocation"></label>
+  </section>
+  <section class="v86-card"><h3>Upcoming</h3>${(state.schedule||[]).map((s,i)=>`<div class="v86-schedule-item"><b>${s.date||"--"} ${s.time||""} — ${s.customer||""}</b><small>${s.job||""}\n${s.location||""}</small><div class="v86-actions"><button onclick="state.schedule.splice(${i},1);saveState();renderV86Schedule()">Delete</button></div></div>`).join("")||"<p>No jobs scheduled.</p>"}</section>`;
+  bindPageTools && bindPageTools();
+  v86SaveSchedule.onclick=()=>{state.schedule.unshift({date:v86SchedDate.value,time:v86SchedTime.value,customer:v86SchedCustomer.value,job:v86SchedJob.value,location:v86SchedLocation.value});saveState(); if(typeof toast==="function") toast("Schedule saved"); renderV86Schedule();};
+}
+function renderV86Reports(){
+  v86Ensure();
+  const inv=(state.invoices||[]).reduce((a,i)=>a+Number(i.total||0),0);
+  const q=(state.quotes||[]).reduce((a,i)=>a+Number(i.total||0),0);
+  const clock=v86ClockSeconds()/3600*(state.settings?.laborRate||135);
+  const vals=[inv,q,clock,75,150,225,300]; const max=Math.max(...vals,1);
+  $("#screen").innerHTML = `${pageHead("Earnings Graph","",false)}
+  <section class="v86-card"><h3>Weekly Earnings</h3><h2 class="green">${v86Money(inv+clock)}</h2><div class="v86-graph">${vals.map(v=>`<div class="v86-bar" style="height:${Math.max(8,(v/max)*100)}%"></div>`).join("")}</div><p class="muted">Invoices + active clock estimate</p></section>`;
+  bindPageTools && bindPageTools();
+}
+
 function renderHome(){
-  rwdRepairState();
   const t=state.truck;
   $("#screen").innerHTML = `
     <section class="top-status-grid">
@@ -435,7 +721,7 @@ function scheduleRows(){
   return list.map(x=>`<div class="schedule-row"><time>${x.time || "--"}</time><div><b>${x.customer || "Customer"}</b><small>${x.job || "Job"} • ${x.location || "Location"}</small></div><span class="badge">${x.tech || ""}</span></div>`).join("");
 }
 function recentRows(){
-  const recent = [...(state.workorders||[]).map(x=>({type:"WO",...x})), ...(state.invoices||[]).map(x=>({type:"INV",...x})), ...(state.quotes||[]).map(x=>({type:"QUOTE",...x}))].slice(-3).reverse();
+  const recent = [...state.workorders.map(x=>({type:"WO",...x})), ...state.invoices.map(x=>({type:"INV",...x})), ...state.quotes.map(x=>({type:"QUOTE",...x}))].slice(-3).reverse();
   if(!recent.length) return `<div class="job-row"><b>--</b><div><b>No recent jobs</b><small>Create a work order or invoice</small></div><span></span></div>`;
   return recent.map(x=>`<div class="job-row"><b>${x.type}</b><div><b>${x.customer || "Customer"}</b><small>${x.desc || x.work || x.job || "Saved item"}</small></div><span class="badge">SAVED</span></div>`).join("");
 }
@@ -1106,7 +1392,7 @@ function renderWorkOrders(){
       <label>Cause<textarea id="woCause"></textarea></label>
       <label>Correction<textarea id="woCorrection"></textarea></label>
       <label>Status<select id="woStatus"><option>Open</option><option>Diagnosing</option><option>Waiting Parts</option><option>In Progress</option><option>Complete</option><option>Invoiced</option></select></label>
-      <div class="output">${(state.workorders||[]).map(w=>`${w.status}: ${w.customer} — ${w.desc}`).join("\n") || "No saved work orders."}</div>
+      <div class="output">${state.workorders.map(w=>`${w.status}: ${w.customer} — ${w.desc}`).join("\n") || "No saved work orders."}</div>
     </section>`;
   bindPageTools();
   if($("#speakWO")) $("#speakWO").onclick=()=>startVoiceToField("woVoiceText", spoken=>$("#woComplaint").value=professionalizeWorkText(spoken));
@@ -2387,7 +2673,7 @@ function renderQuoteSendCenter(){
   $("#screen").innerHTML=`${pageHead("Send Quotes","",false)}
   <section class="form-panel">
     <div class="backend-banner"><b>Customer Quote Approval</b><small>Create approval links customers can open on phone, tablet, or computer. They can approve, decline, and sign.</small></div>
-    ${(state.quotes||[]).length ? (state.quotes||[]).map((q,i)=>`<div class="quote-list-card"><b>${q.customer || "Customer"} — ${money(q.total || 0)}</b><small>${q.desc || "Quote"}<br>${quoteStatusPill(q.status || "Pending")}</small><div class="smart-action-row"><button data-create-approval="${i}">Send Link</button><button data-route="communications">Text</button><button data-open-approval="${q.approvalId || ""}">Open Portal</button><button data-convert-invoice="${i}">Invoice</button></div><div class="share-link-box" id="quoteLink_${i}">${q.approvalId ? `${location.origin}${location.pathname}#quoteapproval-${q.approvalId}` : "No link yet"}</div></div>`).join("") : `<div class="output">No quotes saved yet. Create a Smart Quote first.</div>`}
+    ${(state.quotes||[]).length ? state.quotes.map((q,i)=>`<div class="quote-list-card"><b>${q.customer || "Customer"} — ${money(q.total || 0)}</b><small>${q.desc || "Quote"}<br>${quoteStatusPill(q.status || "Pending")}</small><div class="smart-action-row"><button data-create-approval="${i}">Send Link</button><button data-route="communications">Text</button><button data-open-approval="${q.approvalId || ""}">Open Portal</button><button data-convert-invoice="${i}">Invoice</button></div><div class="share-link-box" id="quoteLink_${i}">${q.approvalId ? `${location.origin}${location.pathname}#quoteapproval-${q.approvalId}` : "No link yet"}</div></div>`).join("") : `<div class="output">No quotes saved yet. Create a Smart Quote first.</div>`}
   </section>`;
   bindPageTools();
   $$("[data-create-approval]").forEach(btn=>btn.onclick=()=>{const i=Number(btn.dataset.createApproval);const a=makeQuoteApproval(i);$("#quoteLink_"+i).textContent=a.link;toast("Approval link ready");renderQuoteSendCenter();});
@@ -2503,7 +2789,7 @@ function renderInvoiceSendCenter(){
   $("#screen").innerHTML=`${pageHead("Send Invoices","",false)}
   <section class="form-panel">
     <div class="backend-banner"><b>Customer Invoice Portal</b><small>Send invoice links for viewing, signing, payment tracking, and Square payment link.</small></div>
-    ${(state.invoices||[]).length ? (state.invoices||[]).map((inv,i)=>`<div class="quote-list-card"><b>${inv.customer || "Customer"} — ${money(inv.total || 0)}</b><small>${inv.work || "Invoice"}<br>${invoiceStatusPill(inv.status || "Unpaid")}</small><div class="smart-action-row"><button data-create-invoice-link="${i}">Send Link</button><button data-route="communications">Text</button><button data-open-invoice="${inv.invoiceId || ""}">Open Portal</button><button data-mark-paid="${i}">Paid</button></div><div class="share-link-box" id="invoiceLink_${i}">${inv.invoiceId ? `${location.origin}${location.pathname}#invoiceportal-${inv.invoiceId}` : "No link yet"}</div></div>`).join("") : `<div class="output">No invoices saved yet.</div>`}
+    ${(state.invoices||[]).length ? state.invoices.map((inv,i)=>`<div class="quote-list-card"><b>${inv.customer || "Customer"} — ${money(inv.total || 0)}</b><small>${inv.work || "Invoice"}<br>${invoiceStatusPill(inv.status || "Unpaid")}</small><div class="smart-action-row"><button data-create-invoice-link="${i}">Send Link</button><button data-route="communications">Text</button><button data-open-invoice="${inv.invoiceId || ""}">Open Portal</button><button data-mark-paid="${i}">Paid</button></div><div class="share-link-box" id="invoiceLink_${i}">${inv.invoiceId ? `${location.origin}${location.pathname}#invoiceportal-${inv.invoiceId}` : "No link yet"}</div></div>`).join("") : `<div class="output">No invoices saved yet.</div>`}
   </section>`;
   bindPageTools();
   $$("[data-create-invoice-link]").forEach(btn=>btn.onclick=()=>{const i=Number(btn.dataset.createInvoiceLink);const link=makeInvoiceLink(i);$("#invoiceLink_"+i).textContent=link.link;toast("Invoice link ready");renderInvoiceSendCenter();});
@@ -4172,105 +4458,12 @@ function rw8Ensure(){ if(typeof ensureV70==="function") ensureV70(); state.rw8=s
 function rw8Clean(s){return String(s||"").replace(/\\n/g,"\n").trim();}
 function rw8Context(){rw8Ensure();return{customer:state.rw8.memory.customer||state.truck?.customer||"",truck:state.rw8.memory.truck||state.truck?.unit||"",vin:state.rw8.memory.vin||state.truck?.vin||"",engine:state.rw8.memory.engine||state.truck?.engine||"",year:state.rw8.memory.year||"",make:state.rw8.memory.make||"",rate:Number(state.settings?.laborRate||state.settings?.rate||135),serviceCall:Number(state.settings?.serviceCall||250)}}
 function rw8ExtractMemory(text){const t=String(text||""),low=t.toLowerCase(),year=(t.match(/\b(19|20)\d{2}\b/)||[])[0];const makes=["peterbilt","kenworth","freightliner","international","volvo","mack","western star","ford","chevy","gmc","ram"];const make=makes.find(m=>low.includes(m));let engine="";if(low.includes("isx"))engine="Cummins ISX";if(low.includes("x15"))engine="Cummins X15";if(low.includes("dd15"))engine="Detroit DD15";if(low.includes("dd13"))engine="Detroit DD13";if(low.includes("mx13")||low.includes("mx-13"))engine="PACCAR MX-13";if(year||make||engine){state.rw8.memory.year=year||state.rw8.memory.year||"";state.rw8.memory.make=make?make.replace(/\b\w/g,c=>c.toUpperCase()):state.rw8.memory.make||"";state.rw8.memory.engine=engine||state.rw8.memory.engine||"";state.rw8.memory.truck=[state.rw8.memory.year,state.rw8.memory.make].filter(Boolean).join(" ")||state.rw8.memory.truck||"";}saveState();}
-function rw8Intent(text){const q=String(text||"").toLowerCase().trim();if(["clear","clear chat","new chat","reset"].includes(q))return"clear";if(["send to quotes","open quote","open quotes","save quote","go to quotes"].includes(q))return"open_quote";if(["find parts","parts"].includes(q))return"parts_action";if(["build invoice","open invoice","open invoices"].includes(q))return"invoice_action";if(q.includes("quote")||q.includes("estimate"))return"quote";if(q.includes("invoice")||q.includes("bill"))return"invoice";if(q.includes("spn")||q.includes("fmi")||q.includes("fault")||q.includes("code")||q.includes("diagnos")||q.includes("low boost")||q.includes("no boost")||q.includes("underboost")||q.includes("overheat")||q.includes("air leak"))return"diagnostic";if(q.includes("memory")||q.includes("save this fix")||q.includes("seen this before"))return"memory";if(q.includes("part")||q.includes("supplier")||q.includes("price"))return"parts";if(q.includes("photo")||q.includes("picture")||q.includes("scan")||q.includes("vin plate"))return"vision";return"general";}
+function rw8Intent(text){const q=String(text||"").toLowerCase().trim();if(["clear","clear chat","new chat","reset"].includes(q))return"clear";if(["send to quotes","open quote","open quotes","save quote","go to quotes"].includes(q))return"open_quote";if(["find parts","parts"].includes(q))return"parts_action";if(["build invoice","open invoice","open invoices"].includes(q))return"invoice_action";if(q.includes("quote")||q.includes("estimate"))return"quote";if(q.includes("invoice")||q.includes("bill"))return"invoice";if(q.includes("spn")||q.includes("fmi")||q.includes("fault")||q.includes("code")||q.includes("diagnos"))return"diagnostic";if(q.includes("memory")||q.includes("save this fix")||q.includes("seen this before"))return"memory";if(q.includes("part")||q.includes("supplier")||q.includes("price"))return"parts";if(q.includes("photo")||q.includes("picture")||q.includes("scan")||q.includes("vin plate"))return"vision";return"general";}
 function rw8Quote(text){const ctx=rw8Context(),low=String(text).toLowerCase();let hours=3,title="Repair Quote",parts="Parts to be verified by VIN and supplier before final approval";if(low.includes("clutch")){hours=11.5;title="Clutch Replacement";parts="Clutch kit\nPilot bearing\nRelease bearing / throwout bearing\nFlywheel inspection / resurface or replacement if needed\nTransmission fluid if needed\nShop supplies";}else if(low.includes("water pump")){hours=4;title="Water Pump Replacement";parts="Water pump\nBelt if needed\nCoolant\nGaskets / seals\nShop supplies";}else if(low.includes("wheel seal")){hours=2.5;title="Wheel Seal Repair";parts="Wheel seal\nHub oil\nBrake clean\nPossible bearings if damaged";}const labor=hours*ctx.rate,service=ctx.serviceCall,supplies=low.includes("clutch")?45:25,total=labor+service+supplies;return{customer:ctx.customer,truck:ctx.truck||[ctx.year,ctx.make].filter(Boolean).join(" "),engine:ctx.engine,desc:text,title,hours,rate:ctx.rate,serviceCall:service,supplies,parts,partsSource:"Parts price/location to be verified before final approval",subtotal:total,total,status:"Draft",ai:true,date:new Date().toLocaleString(),professionalText:`${title}\n\nTruck: ${ctx.truck||"Verify truck"}\nEngine: ${ctx.engine||"Verify engine"}\nLabor: ${hours} hrs @ ${money(ctx.rate)}/hr\nService Call: ${money(service)}\nEstimated Total: ${money(total)}\n\nParts:\n${parts}`};}
 function rw8Push(role,text,kind,meta){state.brainChats.push({role,text:rw8Clean(text),kind:kind||"",meta:meta||null,date:new Date().toLocaleString()});saveState();}
 function rw8RenderCard(card){if(!card)return"";if(card.type==="quote"){const q=card.quote;return `<div class="rw8-card"><h3>${q.title||"Quote Detected"}</h3><div class="rw8-kpis"><div class="rw8-kpi"><small>Labor</small><b>${q.hours} hrs</b></div><div class="rw8-kpi"><small>Service</small><b>${money(q.serviceCall)}</b></div><div class="rw8-kpi"><small>Total</small><b>${money(q.total)}</b></div></div><div class="rw8-msg ai" style="max-width:100%;margin:0;"><b>Parts</b>${q.parts}</div><div class="rw8-actions"><button class="primary" data-rw8-action="openQuote">Open Quote</button><button data-rw8-action="findParts">Find Parts</button><button data-rw8-action="sendQuote">Send Customer</button><button data-rw8-action="invoiceQuote">Build Invoice</button></div></div>`;}if(card.type==="diagnostic"){return `<div class="rw8-card"><h3>Diagnostic Interview</h3><div class="rw8-msg ai" style="max-width:100%;margin:0;"><b>Next Questions</b>${card.text}</div><div class="rw8-actions"><button class="primary" data-rw8-action="saveMemory">Save Memory</button><button data-rw8-action="openFault">Open Fault Doctor</button></div></div>`;}return"";}
 function rw8Diagnostic(text){return`I can help diagnose that.\n\nAnswer these:\n1. Is the code active or inactive?\n2. What engine and truck?\n3. Any recent repair?\n4. What are the live data readings?\n5. Does it happen loaded, idle, regen, or driving?\n\nThen I’ll narrow it down step by step.`;}
-async 
-function rw82DieselAnswer(text){
-  const q=String(text||"").toLowerCase();
-  if(q.includes("low boost")||q.includes("no boost")||q.includes("underboost")){
-    return `Low boost on a Cummins X15 is usually caused by:
-
-1. Charge air cooler boot split, loose clamp, or CAC leak
-2. Exhaust leak before the turbo
-3. VGT actuator sticking or failed calibration
-4. Turbo vanes sticking / turbo failure
-5. Intake restriction or plugged air filter
-6. Boost pressure sensor reading wrong
-7. EGR valve stuck open
-8. Fuel restriction causing low exhaust energy
-9. DPF/aftertreatment restriction or derate
-10. ECM limiting fuel because of active faults
-
-Fast checks:
-- Check boost under load.
-- Inspect CAC boots for oil tracks, splits, loose clamps.
-- Pressure test charge air system.
-- Check exhaust leaks at manifold/turbo inlet.
-- Run VGT sweep/calibration.
-- Compare commanded vs actual turbo position.
-- Check MAP sensor KOEO reading against baro.
-- Check codes and derate status.
-
-Questions:
-What boost PSI are you seeing under load?
-Any SPN/FMI?
-Black smoke, no smoke, or derate?
-Does VGT sweep pass?`;
-  }
-  if(q.includes("overheat")||q.includes("overheating")){
-    return `For overheating, start here:
-
-1. Confirm coolant temp with scan tool and temp gun.
-2. Check coolant level and pressure cap.
-3. Verify fan command and fan clutch engagement.
-4. Check radiator/CAC/condenser plugging.
-5. Compare top and bottom hose temperatures.
-6. Check thermostat operation.
-7. Check water pump flow.
-8. Check for combustion gas in coolant.
-
-Does it overheat only during regen or all the time?`;
-  }
-  if(q.includes("spn 3364")||q.includes("3364")){
-    return `SPN 3364 is usually DEF quality/DEF dosing/SCR related depending on FMI.
-
-Checks:
-1. Confirm FMI.
-2. Test DEF quality.
-3. Inspect DEF tank contamination.
-4. Inspect DEF doser crystallization.
-5. Run dosing quantity test.
-6. Check DEF pump pressure and purge.
-7. Compare inlet/outlet NOx readings.
-8. Check exhaust leaks before SCR.
-
-What FMI is showing?`;
-  }
-  if(q.includes("air leak")){
-    return `Air leak checks:
-
-If it leaks released and stops when brakes are applied, suspect a valve backfeed or quick release/relay issue.
-
-Check:
-1. Exact exhaust port leaking.
-2. Park released/applied.
-3. Service brake applied/released.
-4. Trailer supply/control position.
-5. Brake chamber diaphragm backfeed.
-6. Cap delivery lines one at a time if safe.`;
-  }
-  return "";
-}
-async function rw82RealAI(text){
-  if(state.backend && state.backend.aiEndpoint && state.brainSettings && state.brainSettings.useBackend){
-    try{
-      const ctx = typeof rw8Context==="function" ? rw8Context() : {};
-      const r = await fetch(state.backend.aiEndpoint,{
-        method:"POST",
-        headers:{"Content-Type":"application/json","Authorization":"Bearer "+(state.backend.aiKey||"")},
-        body:JSON.stringify({prompt:text,context:ctx,role:"Rolling Wrench AI diesel mechanic assistant"})
-      });
-      const data = await r.json();
-      return data.answer || data.text || data.message || "";
-    }catch(e){return "";}
-  }
-  return "";
-}
-
-function rw8Run(text){rw8Ensure();text=String(text||"").trim();if(!text)return;const intent=rw8Intent(text);if(intent==="clear"){state.brainChats=[];saveState();renderRW8Brain();return;}if(intent==="open_quote"){setRoute("quotes");return;}if(intent==="parts_action"){setRoute("parts");return;}if(intent==="invoice_action"){setRoute("invoices");return;}rw8ExtractMemory(text);rw8Push("user",text);if(intent==="quote"){const q=rw8Quote(text);state.quotes.unshift(q);state.rw8.lastCard={type:"quote",quote:q};saveState();rw8Push("ai",`I found a ${q.title.toLowerCase()}.\n\nLabor: ${q.hours} hrs\nEstimated Total: ${money(q.total)}\n\nI saved a quote draft.`);rw8Push("ai","quote card","card",state.rw8.lastCard);}else if(intent==="diagnostic"){let real=await rw82RealAI(text);const d=real||rw82DieselAnswer(text)||rw8Diagnostic(text);state.notes.unshift({type:"AI Diagnostic",note:d,date:new Date().toLocaleString()});state.rw8.lastCard={type:"diagnostic",text:d};saveState();rw8Push("ai",d,"card",state.rw8.lastCard);}else if(intent==="invoice"){const ctx=rw8Context();state.invoices.unshift({customer:ctx.customer,truck:ctx.truck,work:text,total:0,status:"Draft",ai:true,date:new Date().toLocaleString()});saveState();rw8Push("ai","I built an invoice draft and saved it to Invoices.");}else if(intent==="memory"){const ctx=rw8Context();if(typeof ensureV691==="function")ensureV691();state.repairMemory.unshift({id:"MEM-RW8-"+Date.now(),title:text.slice(0,55),complaint:text,cause:"",correction:"",customer:ctx.customer,truck:ctx.truck,engine:ctx.engine,keywords:text,status:"Saved",date:new Date().toLocaleString(),ai:true});saveState();rw8Push("ai","Saved to Repair Memory.");}else if(intent==="vision"){rw8Push("ai","Open OCR/Vision and attach the photo. Once the real vision backend is connected, I’ll read the image like ChatGPT/Gemini.");}else{let real=await rw82RealAI(text);let diesel=real||rw82DieselAnswer(text);rw8Push("ai",diesel||"I’m following. I can answer repair questions, ask diagnostic follow-ups, build quotes, invoices, work orders, repair memories, parts lookups, or open photo/OCR.");}renderRW8Brain();}
+async function rw8Run(text){rw8Ensure();text=String(text||"").trim();if(!text)return;const intent=rw8Intent(text);if(intent==="clear"){state.brainChats=[];saveState();renderRW8Brain();return;}if(intent==="open_quote"){setRoute("quotes");return;}if(intent==="parts_action"){setRoute("parts");return;}if(intent==="invoice_action"){setRoute("invoices");return;}rw8ExtractMemory(text);rw8Push("user",text);if(intent==="quote"){const q=rw8Quote(text);state.quotes.unshift(q);state.rw8.lastCard={type:"quote",quote:q};saveState();rw8Push("ai",`I found a ${q.title.toLowerCase()}.\n\nLabor: ${q.hours} hrs\nEstimated Total: ${money(q.total)}\n\nI saved a quote draft.`);rw8Push("ai","quote card","card",state.rw8.lastCard);}else if(intent==="diagnostic"){const d=rw8Diagnostic(text);state.notes.unshift({type:"AI Diagnostic",note:d,date:new Date().toLocaleString()});state.rw8.lastCard={type:"diagnostic",text:d};saveState();rw8Push("ai",d,"card",state.rw8.lastCard);}else if(intent==="invoice"){const ctx=rw8Context();state.invoices.unshift({customer:ctx.customer,truck:ctx.truck,work:text,total:0,status:"Draft",ai:true,date:new Date().toLocaleString()});saveState();rw8Push("ai","I built an invoice draft and saved it to Invoices.");}else if(intent==="memory"){const ctx=rw8Context();if(typeof ensureV691==="function")ensureV691();state.repairMemory.unshift({id:"MEM-RW8-"+Date.now(),title:text.slice(0,55),complaint:text,cause:"",correction:"",customer:ctx.customer,truck:ctx.truck,engine:ctx.engine,keywords:text,status:"Saved",date:new Date().toLocaleString(),ai:true});saveState();rw8Push("ai","Saved to Repair Memory.");}else if(intent==="vision"){rw8Push("ai","Open OCR/Vision and attach the photo. Once the real vision backend is connected, I’ll read the image like ChatGPT/Gemini.");}else{rw8Push("ai","I’m following. Tell me if you want a quote, invoice, work order, repair memory, parts lookup, or diagnostic steps.");}renderRW8Brain();}
 
 function rw8KeyboardSafeScroll(){
   setTimeout(()=>{
@@ -4446,110 +4639,64 @@ render(currentRoute());
 if("serviceWorker" in navigator){navigator.serviceWorker.register("./service-worker.js").catch(()=>{});}
 
 
-/* ===== V8.3 STARTUP HOME FIX ===== */
-function rw83ForceHome(){
+/* ===== V8.5 STABLE SAFE STARTUP ===== */
+function rwdV85NormalizeState(){
   try{
-    document.body.classList.remove("rw-ai-mode");
-    document.body.classList.remove("ai-lock");
-    document.body.classList.remove("ai-full-open");
-  }catch(e){}
-  try{
-    if(location.hash === "" || location.hash === "#" || location.hash === "#home" || location.hash.includes("recovery")){
-      location.hash = "home";
-    }
-  }catch(e){}
-  try{
-    if(typeof ensureState === "function") ensureState();
-  }catch(e){}
-  try{
-    if(typeof ensureV70 === "function") ensureV70();
-  }catch(e){}
-  try{
-    if(typeof ensureV691 === "function") ensureV691();
-  }catch(e){}
-  try{
-    if(typeof renderHome === "function"){
-      renderHome();
-      document.body.classList.add("home-force-loaded");
-      return true;
-    }
+    window.state = window.state || {};
+    state.settings = Object.assign({shop:"Rolling Wrench Diesel", phone:"260-502-6222", laborRate:135, serviceCall:250, tax:0, cardFee:0}, state.settings || {});
+    state.truck = Object.assign({unit:"No Active Truck", vin:"NONE", customer:"", engine:"Cummins X15", transmission:"", mileage:"", cpl:""}, state.truck || {});
+    state.jobs = state.jobs || {};
+    ["job1","job2","job3"].forEach((id,i)=>{
+      state.jobs[id] = Object.assign({name:`Job ${i+1}`, customer:"", seconds:0, baseSeconds:0, startTimestamp:null, running:false, saved:[], status:"READY"}, state.jobs[id] || {});
+    });
+    ["invoices","quotes","workorders","customers","schedule","parts","notes","pins","pm","trucks","notifications","files","repairMemory","aiConversations","pmRecords","brainChats"].forEach(k=>{
+      if(!Array.isArray(state[k])) state[k] = [];
+    });
   }catch(e){
-    console.warn("renderHome failed, using fallback home", e);
+    console.warn("V8.5 state normalize skipped", e);
   }
-  try{
-    const screen = document.querySelector("#screen");
-    if(screen){
-      screen.innerHTML = `
-        <section class="top-cards">
-          <div class="dash-card"><b>TIME CLOCK</b><h2>00:00:00</h2><small>READY</small></div>
-          <div class="dash-card"><b>ACTIVE TRUCK</b><h2>No Active Truck</h2><small>Open Truck Profile</small></div>
-          <div class="dash-card"><b>SYSTEM</b><h2>READY</h2><small>Local save active</small></div>
-        </section>
-        <section class="ai-entry" data-route="brain"><b>Ask Rolling Wrench AI</b><small>Quotes • invoices • diagnostics • parts • OCR</small></section>
-        <section class="module-grid">
-          <button data-route="truck">Truck Profile</button>
-          <button data-route="quotes">Smart Quotes</button>
-          <button data-route="invoices">Invoices</button>
-          <button data-route="workorders">Work Orders</button>
-          <button data-route="memorylibrary">Repair Memory</button>
-          <button data-route="settings">Settings</button>
-        </section>`;
-      if(typeof bindPageTools === "function") bindPageTools();
-      document.body.classList.add("home-force-loaded");
-      return true;
-    }
-  }catch(e){}
-  return false;
 }
-window.addEventListener("error", function(e){
-  const msg = String(e.message || "");
-  if(msg.includes("Home did not render") || msg.includes("Home") || msg.includes("render")){
-    setTimeout(rw83ForceHome, 50);
-  }
-});
-window.addEventListener("DOMContentLoaded", function(){
-  setTimeout(function(){
-    const txt = (document.body && document.body.innerText) ? document.body.innerText : "";
-    if(txt.includes("HOME") || txt.includes("Home did not render automatically")){
-      rw83ForceHome();
-    }
-  }, 250);
+document.addEventListener("DOMContentLoaded", function(){
+  try{ rwdV85NormalizeState(); }catch(e){}
 });
 window.addEventListener("load", function(){
-  setTimeout(function(){
-    const txt = (document.body && document.body.innerText) ? document.body.innerText : "";
-    const screen = document.querySelector("#screen");
-    if(!screen || txt.includes("HOME") || txt.includes("Home did not render automatically")){
-      rw83ForceHome();
-    }
-  }, 500);
+  try{ rwdV85NormalizeState(); }catch(e){}
 });
 
 
-function shouldShowLogin(){ return false; }
-function requireLogin(){ return false; }
-function showLogin(){ return rwdBypassLoginAndHome ? rwdBypassLoginAndHome() : false; }
-function renderLogin(){ return rwdBypassLoginAndHome ? rwdBypassLoginAndHome() : false; }
-function renderSignin(){ return rwdBypassLoginAndHome ? rwdBypassLoginAndHome() : false; }
-function renderSignIn(){ return rwdBypassLoginAndHome ? rwdBypassLoginAndHome() : false; }
-
-
-function rwdClearBrokenLocalData(){
-  try{
-    localStorage.removeItem("RWD_V41_STATE");
-    localStorage.removeItem("RWD_AI_CLEAN_RESCUE_STATE_V1");
-    location.hash="home";
-    location.reload();
-  }catch(e){}
-}
-
-
-/* V8.3d setRoute override */
-setTimeout(function(){
+/* V8.6 route additions */
+(function(){
+  const oldSetRoute = window.setRoute || setRoute;
   window.setRoute = function(route){
-    window.rwdHardSetRoute(route);
+    const r=String(route||"home").toLowerCase();
+    if(r==="quotes"){ location.hash="quotes"; renderV86Quotes(); return; }
+    if(r==="memory"||r==="memorylibrary"){ location.hash="memory"; renderV86Memory(); return; }
+    if(r==="clock"){ location.hash="clock"; renderV86Clock(); return; }
+    if(r==="schedule"){ location.hash="schedule"; renderV86Schedule(); return; }
+    if(r==="reports"||r==="dashboard"||r==="business"){ location.hash="reports"; renderV86Reports(); return; }
+    oldSetRoute(route);
   };
-  window.currentRoute = function(){
-    return (location.hash || "#home").replace("#","") || "home";
+})();
+
+
+/* V8.7 AI route */
+(function(){
+  const oldSetRouteV87 = window.setRoute || setRoute;
+  window.setRoute = function(route){
+    const r=String(route||"home").toLowerCase();
+    if(r==="ai" || r==="brain"){ location.hash="brain"; renderV87AI(); return; }
+    oldSetRouteV87(route);
   };
-}, 0);
+})();
+
+
+/* V8.8 backend/AI route */
+(function(){
+  const oldSetRouteV88 = window.setRoute || setRoute;
+  window.setRoute = function(route){
+    const r=String(route||"home").toLowerCase();
+    if(r==="ai" || r==="brain"){ location.hash="brain"; renderV88AI(); return; }
+    if(r==="backendconnections" || r==="backend" || r==="brainsettings"){ location.hash="backendconnections"; renderBackendConnections(); return; }
+    oldSetRouteV88(route);
+  };
+})();
