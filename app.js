@@ -3897,12 +3897,105 @@ function rw8Ensure(){ if(typeof ensureV70==="function") ensureV70(); state.rw8=s
 function rw8Clean(s){return String(s||"").replace(/\\n/g,"\n").trim();}
 function rw8Context(){rw8Ensure();return{customer:state.rw8.memory.customer||state.truck?.customer||"",truck:state.rw8.memory.truck||state.truck?.unit||"",vin:state.rw8.memory.vin||state.truck?.vin||"",engine:state.rw8.memory.engine||state.truck?.engine||"",year:state.rw8.memory.year||"",make:state.rw8.memory.make||"",rate:Number(state.settings?.laborRate||state.settings?.rate||135),serviceCall:Number(state.settings?.serviceCall||250)}}
 function rw8ExtractMemory(text){const t=String(text||""),low=t.toLowerCase(),year=(t.match(/\b(19|20)\d{2}\b/)||[])[0];const makes=["peterbilt","kenworth","freightliner","international","volvo","mack","western star","ford","chevy","gmc","ram"];const make=makes.find(m=>low.includes(m));let engine="";if(low.includes("isx"))engine="Cummins ISX";if(low.includes("x15"))engine="Cummins X15";if(low.includes("dd15"))engine="Detroit DD15";if(low.includes("dd13"))engine="Detroit DD13";if(low.includes("mx13")||low.includes("mx-13"))engine="PACCAR MX-13";if(year||make||engine){state.rw8.memory.year=year||state.rw8.memory.year||"";state.rw8.memory.make=make?make.replace(/\b\w/g,c=>c.toUpperCase()):state.rw8.memory.make||"";state.rw8.memory.engine=engine||state.rw8.memory.engine||"";state.rw8.memory.truck=[state.rw8.memory.year,state.rw8.memory.make].filter(Boolean).join(" ")||state.rw8.memory.truck||"";}saveState();}
-function rw8Intent(text){const q=String(text||"").toLowerCase().trim();if(["clear","clear chat","new chat","reset"].includes(q))return"clear";if(["send to quotes","open quote","open quotes","save quote","go to quotes"].includes(q))return"open_quote";if(["find parts","parts"].includes(q))return"parts_action";if(["build invoice","open invoice","open invoices"].includes(q))return"invoice_action";if(q.includes("quote")||q.includes("estimate"))return"quote";if(q.includes("invoice")||q.includes("bill"))return"invoice";if(q.includes("spn")||q.includes("fmi")||q.includes("fault")||q.includes("code")||q.includes("diagnos"))return"diagnostic";if(q.includes("memory")||q.includes("save this fix")||q.includes("seen this before"))return"memory";if(q.includes("part")||q.includes("supplier")||q.includes("price"))return"parts";if(q.includes("photo")||q.includes("picture")||q.includes("scan")||q.includes("vin plate"))return"vision";return"general";}
+function rw8Intent(text){const q=String(text||"").toLowerCase().trim();if(["clear","clear chat","new chat","reset"].includes(q))return"clear";if(["send to quotes","open quote","open quotes","save quote","go to quotes"].includes(q))return"open_quote";if(["find parts","parts"].includes(q))return"parts_action";if(["build invoice","open invoice","open invoices"].includes(q))return"invoice_action";if(q.includes("quote")||q.includes("estimate"))return"quote";if(q.includes("invoice")||q.includes("bill"))return"invoice";if(q.includes("spn")||q.includes("fmi")||q.includes("fault")||q.includes("code")||q.includes("diagnos")||q.includes("low boost")||q.includes("no boost")||q.includes("underboost")||q.includes("overheat")||q.includes("air leak"))return"diagnostic";if(q.includes("memory")||q.includes("save this fix")||q.includes("seen this before"))return"memory";if(q.includes("part")||q.includes("supplier")||q.includes("price"))return"parts";if(q.includes("photo")||q.includes("picture")||q.includes("scan")||q.includes("vin plate"))return"vision";return"general";}
 function rw8Quote(text){const ctx=rw8Context(),low=String(text).toLowerCase();let hours=3,title="Repair Quote",parts="Parts to be verified by VIN and supplier before final approval";if(low.includes("clutch")){hours=11.5;title="Clutch Replacement";parts="Clutch kit\nPilot bearing\nRelease bearing / throwout bearing\nFlywheel inspection / resurface or replacement if needed\nTransmission fluid if needed\nShop supplies";}else if(low.includes("water pump")){hours=4;title="Water Pump Replacement";parts="Water pump\nBelt if needed\nCoolant\nGaskets / seals\nShop supplies";}else if(low.includes("wheel seal")){hours=2.5;title="Wheel Seal Repair";parts="Wheel seal\nHub oil\nBrake clean\nPossible bearings if damaged";}const labor=hours*ctx.rate,service=ctx.serviceCall,supplies=low.includes("clutch")?45:25,total=labor+service+supplies;return{customer:ctx.customer,truck:ctx.truck||[ctx.year,ctx.make].filter(Boolean).join(" "),engine:ctx.engine,desc:text,title,hours,rate:ctx.rate,serviceCall:service,supplies,parts,partsSource:"Parts price/location to be verified before final approval",subtotal:total,total,status:"Draft",ai:true,date:new Date().toLocaleString(),professionalText:`${title}\n\nTruck: ${ctx.truck||"Verify truck"}\nEngine: ${ctx.engine||"Verify engine"}\nLabor: ${hours} hrs @ ${money(ctx.rate)}/hr\nService Call: ${money(service)}\nEstimated Total: ${money(total)}\n\nParts:\n${parts}`};}
 function rw8Push(role,text,kind,meta){state.brainChats.push({role,text:rw8Clean(text),kind:kind||"",meta:meta||null,date:new Date().toLocaleString()});saveState();}
 function rw8RenderCard(card){if(!card)return"";if(card.type==="quote"){const q=card.quote;return `<div class="rw8-card"><h3>${q.title||"Quote Detected"}</h3><div class="rw8-kpis"><div class="rw8-kpi"><small>Labor</small><b>${q.hours} hrs</b></div><div class="rw8-kpi"><small>Service</small><b>${money(q.serviceCall)}</b></div><div class="rw8-kpi"><small>Total</small><b>${money(q.total)}</b></div></div><div class="rw8-msg ai" style="max-width:100%;margin:0;"><b>Parts</b>${q.parts}</div><div class="rw8-actions"><button class="primary" data-rw8-action="openQuote">Open Quote</button><button data-rw8-action="findParts">Find Parts</button><button data-rw8-action="sendQuote">Send Customer</button><button data-rw8-action="invoiceQuote">Build Invoice</button></div></div>`;}if(card.type==="diagnostic"){return `<div class="rw8-card"><h3>Diagnostic Interview</h3><div class="rw8-msg ai" style="max-width:100%;margin:0;"><b>Next Questions</b>${card.text}</div><div class="rw8-actions"><button class="primary" data-rw8-action="saveMemory">Save Memory</button><button data-rw8-action="openFault">Open Fault Doctor</button></div></div>`;}return"";}
 function rw8Diagnostic(text){return`I can help diagnose that.\n\nAnswer these:\n1. Is the code active or inactive?\n2. What engine and truck?\n3. Any recent repair?\n4. What are the live data readings?\n5. Does it happen loaded, idle, regen, or driving?\n\nThen I’ll narrow it down step by step.`;}
-async function rw8Run(text){rw8Ensure();text=String(text||"").trim();if(!text)return;const intent=rw8Intent(text);if(intent==="clear"){state.brainChats=[];saveState();renderRW8Brain();return;}if(intent==="open_quote"){setRoute("quotes");return;}if(intent==="parts_action"){setRoute("parts");return;}if(intent==="invoice_action"){setRoute("invoices");return;}rw8ExtractMemory(text);rw8Push("user",text);if(intent==="quote"){const q=rw8Quote(text);state.quotes.unshift(q);state.rw8.lastCard={type:"quote",quote:q};saveState();rw8Push("ai",`I found a ${q.title.toLowerCase()}.\n\nLabor: ${q.hours} hrs\nEstimated Total: ${money(q.total)}\n\nI saved a quote draft.`);rw8Push("ai","quote card","card",state.rw8.lastCard);}else if(intent==="diagnostic"){const d=rw8Diagnostic(text);state.notes.unshift({type:"AI Diagnostic",note:d,date:new Date().toLocaleString()});state.rw8.lastCard={type:"diagnostic",text:d};saveState();rw8Push("ai",d,"card",state.rw8.lastCard);}else if(intent==="invoice"){const ctx=rw8Context();state.invoices.unshift({customer:ctx.customer,truck:ctx.truck,work:text,total:0,status:"Draft",ai:true,date:new Date().toLocaleString()});saveState();rw8Push("ai","I built an invoice draft and saved it to Invoices.");}else if(intent==="memory"){const ctx=rw8Context();if(typeof ensureV691==="function")ensureV691();state.repairMemory.unshift({id:"MEM-RW8-"+Date.now(),title:text.slice(0,55),complaint:text,cause:"",correction:"",customer:ctx.customer,truck:ctx.truck,engine:ctx.engine,keywords:text,status:"Saved",date:new Date().toLocaleString(),ai:true});saveState();rw8Push("ai","Saved to Repair Memory.");}else if(intent==="vision"){rw8Push("ai","Open OCR/Vision and attach the photo. Once the real vision backend is connected, I’ll read the image like ChatGPT/Gemini.");}else{rw8Push("ai","I’m following. Tell me if you want a quote, invoice, work order, repair memory, parts lookup, or diagnostic steps.");}renderRW8Brain();}
+async 
+function rw82DieselAnswer(text){
+  const q=String(text||"").toLowerCase();
+  if(q.includes("low boost")||q.includes("no boost")||q.includes("underboost")){
+    return `Low boost on a Cummins X15 is usually caused by:
+
+1. Charge air cooler boot split, loose clamp, or CAC leak
+2. Exhaust leak before the turbo
+3. VGT actuator sticking or failed calibration
+4. Turbo vanes sticking / turbo failure
+5. Intake restriction or plugged air filter
+6. Boost pressure sensor reading wrong
+7. EGR valve stuck open
+8. Fuel restriction causing low exhaust energy
+9. DPF/aftertreatment restriction or derate
+10. ECM limiting fuel because of active faults
+
+Fast checks:
+- Check boost under load.
+- Inspect CAC boots for oil tracks, splits, loose clamps.
+- Pressure test charge air system.
+- Check exhaust leaks at manifold/turbo inlet.
+- Run VGT sweep/calibration.
+- Compare commanded vs actual turbo position.
+- Check MAP sensor KOEO reading against baro.
+- Check codes and derate status.
+
+Questions:
+What boost PSI are you seeing under load?
+Any SPN/FMI?
+Black smoke, no smoke, or derate?
+Does VGT sweep pass?`;
+  }
+  if(q.includes("overheat")||q.includes("overheating")){
+    return `For overheating, start here:
+
+1. Confirm coolant temp with scan tool and temp gun.
+2. Check coolant level and pressure cap.
+3. Verify fan command and fan clutch engagement.
+4. Check radiator/CAC/condenser plugging.
+5. Compare top and bottom hose temperatures.
+6. Check thermostat operation.
+7. Check water pump flow.
+8. Check for combustion gas in coolant.
+
+Does it overheat only during regen or all the time?`;
+  }
+  if(q.includes("spn 3364")||q.includes("3364")){
+    return `SPN 3364 is usually DEF quality/DEF dosing/SCR related depending on FMI.
+
+Checks:
+1. Confirm FMI.
+2. Test DEF quality.
+3. Inspect DEF tank contamination.
+4. Inspect DEF doser crystallization.
+5. Run dosing quantity test.
+6. Check DEF pump pressure and purge.
+7. Compare inlet/outlet NOx readings.
+8. Check exhaust leaks before SCR.
+
+What FMI is showing?`;
+  }
+  if(q.includes("air leak")){
+    return `Air leak checks:
+
+If it leaks released and stops when brakes are applied, suspect a valve backfeed or quick release/relay issue.
+
+Check:
+1. Exact exhaust port leaking.
+2. Park released/applied.
+3. Service brake applied/released.
+4. Trailer supply/control position.
+5. Brake chamber diaphragm backfeed.
+6. Cap delivery lines one at a time if safe.`;
+  }
+  return "";
+}
+async function rw82RealAI(text){
+  if(state.backend && state.backend.aiEndpoint && state.brainSettings && state.brainSettings.useBackend){
+    try{
+      const ctx = typeof rw8Context==="function" ? rw8Context() : {};
+      const r = await fetch(state.backend.aiEndpoint,{
+        method:"POST",
+        headers:{"Content-Type":"application/json","Authorization":"Bearer "+(state.backend.aiKey||"")},
+        body:JSON.stringify({prompt:text,context:ctx,role:"Rolling Wrench AI diesel mechanic assistant"})
+      });
+      const data = await r.json();
+      return data.answer || data.text || data.message || "";
+    }catch(e){return "";}
+  }
+  return "";
+}
+
+function rw8Run(text){rw8Ensure();text=String(text||"").trim();if(!text)return;const intent=rw8Intent(text);if(intent==="clear"){state.brainChats=[];saveState();renderRW8Brain();return;}if(intent==="open_quote"){setRoute("quotes");return;}if(intent==="parts_action"){setRoute("parts");return;}if(intent==="invoice_action"){setRoute("invoices");return;}rw8ExtractMemory(text);rw8Push("user",text);if(intent==="quote"){const q=rw8Quote(text);state.quotes.unshift(q);state.rw8.lastCard={type:"quote",quote:q};saveState();rw8Push("ai",`I found a ${q.title.toLowerCase()}.\n\nLabor: ${q.hours} hrs\nEstimated Total: ${money(q.total)}\n\nI saved a quote draft.`);rw8Push("ai","quote card","card",state.rw8.lastCard);}else if(intent==="diagnostic"){let real=await rw82RealAI(text);const d=real||rw82DieselAnswer(text)||rw8Diagnostic(text);state.notes.unshift({type:"AI Diagnostic",note:d,date:new Date().toLocaleString()});state.rw8.lastCard={type:"diagnostic",text:d};saveState();rw8Push("ai",d,"card",state.rw8.lastCard);}else if(intent==="invoice"){const ctx=rw8Context();state.invoices.unshift({customer:ctx.customer,truck:ctx.truck,work:text,total:0,status:"Draft",ai:true,date:new Date().toLocaleString()});saveState();rw8Push("ai","I built an invoice draft and saved it to Invoices.");}else if(intent==="memory"){const ctx=rw8Context();if(typeof ensureV691==="function")ensureV691();state.repairMemory.unshift({id:"MEM-RW8-"+Date.now(),title:text.slice(0,55),complaint:text,cause:"",correction:"",customer:ctx.customer,truck:ctx.truck,engine:ctx.engine,keywords:text,status:"Saved",date:new Date().toLocaleString(),ai:true});saveState();rw8Push("ai","Saved to Repair Memory.");}else if(intent==="vision"){rw8Push("ai","Open OCR/Vision and attach the photo. Once the real vision backend is connected, I’ll read the image like ChatGPT/Gemini.");}else{let real=await rw82RealAI(text);let diesel=real||rw82DieselAnswer(text);rw8Push("ai",diesel||"I’m following. I can answer repair questions, ask diagnostic follow-ups, build quotes, invoices, work orders, repair memories, parts lookups, or open photo/OCR.");}renderRW8Brain();}
 
 function rw8KeyboardSafeScroll(){
   setTimeout(()=>{

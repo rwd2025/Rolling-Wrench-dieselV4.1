@@ -244,3 +244,5 @@ V8.1 AI CHAT BOX FIX:
 - Input bar uses safe-area width and minmax sizing.
 - Keyboard focus auto-scrolls newest messages/input.
 - Added fallback CSS for older V7.2 AI bar if browser cache still shows it.
+
+V8.2: mobile button fit, diesel diagnostic fallback knowledge, real AI endpoint path, better low-boost/overheat/SPN/air-leak answers.
