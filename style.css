@@ -2094,3 +2094,6 @@ body.rw-ai-mode{
 .ai-mini-card{border:1px solid rgba(104,121,139,.35);background:#071018;border-radius:12px;padding:9px}
 .ai-mini-card b{display:block;color:#fff;margin-bottom:3px}.ai-mini-card span{color:#9aa8b6;font-size:13px}
 @media(max-width:520px){.ai-mini-grid{grid-template-columns:1fr}.ai-rich-answer h2{font-size:20px}}
+
+/* ===== V9.2 LIVE BACKEND POLISH ===== */
+.ai-live-badge{border:1px solid rgba(45,224,113,.55)!important;background:#07160d!important;color:#d8ffe6!important;border-radius:999px;padding:5px 9px;font-size:11px;font-weight:900;text-transform:uppercase}

@@ -316,3 +316,12 @@ V9.0a FORCE AI BRAIN:
 - Adds hard click override for [data-route=ai]/brain.
 
 V9.1 AI READABLE ANSWER FORMATTER: headings, bullets, ordered steps, callouts, and cards for repair answers.
+
+V9.2 LIVE BACKEND CONNECTION:
+- Frontend wired to https://rolling-wrench-ai-backend.onrender.com
+- AI Endpoint: /api/ai
+- Vision Endpoint: /api/vision
+- Search Endpoint: /api/search
+- Parts Endpoint: /api/parts
+- AI screen shows AI Online instead of Local.
+- Preserves V9.1 readable formatter.

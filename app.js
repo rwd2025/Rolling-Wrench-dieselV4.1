@@ -5207,3 +5207,196 @@ window.renderV91AI=renderV91AI;window.renderV90A_AI=renderV91AI;window.renderV90
 
 /* V9.1 readable AI route */
 setTimeout(function(){const oldSetRouteV91=window.setRoute||setRoute;window.setRoute=function(route){const r=String(route||"home").toLowerCase();if(r==="ai"||r==="brain"||r==="rwai"){location.hash="brain";renderV91AI();return;}oldSetRouteV91(route);};},0);
+
+
+/* ===== V9.2 LIVE BACKEND CONNECTION ===== */
+const RW_LIVE_BACKEND_URL = "https://rolling-wrench-ai-backend.onrender.com";
+
+function rw92EnsureBackend(){
+  state.backend = state.backend || {};
+  state.backend.aiEndpoint = RW_LIVE_BACKEND_URL + "/api/ai";
+  state.backend.visionEndpoint = RW_LIVE_BACKEND_URL + "/api/vision";
+  state.backend.webEndpoint = RW_LIVE_BACKEND_URL + "/api/search";
+  state.backend.partsEndpoint = RW_LIVE_BACKEND_URL + "/api/parts";
+  if(typeof saveState === "function") saveState();
+}
+
+async function rw92Post(url, payload){
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload || {})
+  });
+  const txt = await res.text();
+  let data;
+  try { data = JSON.parse(txt); } catch(e) { data = { answer: txt }; }
+  if(!res.ok) throw new Error(data.error || data.message || txt || ("HTTP " + res.status));
+  return data;
+}
+
+async function rw92AskBackend(prompt, files){
+  rw92EnsureBackend();
+  const q = String(prompt || "");
+  const context = {
+    truck: state.truck || {},
+    settings: state.settings || {},
+    pending: state.v87 ? state.v87.pending : null,
+    recentQuotes: (state.quotes || []).slice(-5),
+    recentInvoices: (state.invoices || []).slice(-5),
+    repairMemory: (state.repairMemory || []).slice(0,10)
+  };
+  const lower = q.toLowerCase();
+  let url = state.backend.aiEndpoint;
+
+  if(files && files.length && state.backend.visionEndpoint) url = state.backend.visionEndpoint;
+  else if((lower.includes("part") || lower.includes("water pump") || lower.includes("belt") || lower.includes("clutch") || lower.includes("supplier")) && state.backend.partsEndpoint) url = state.backend.partsEndpoint;
+  else if((lower.includes("weather") || lower.includes("today") || lower.includes("current") || lower.includes("near me") || lower.includes("price") || lower.includes("who won")) && state.backend.webEndpoint) url = state.backend.webEndpoint;
+
+  const data = await rw92Post(url, {
+    prompt: q,
+    question: q,
+    context: context,
+    files: files || []
+  });
+
+  return data.answer || data.text || data.message || data.content || JSON.stringify(data, null, 2);
+}
+
+async function rw92RunAI(text){
+  rw92EnsureBackend();
+  text = String(text || "").trim();
+  const files = (state.v89 && state.v89.attachments) ? state.v89.attachments : [];
+  if(!text && !files.length) return;
+
+  state.brainChats = state.brainChats || [];
+
+  if(["clear","clear chat","new chat"].includes(text.toLowerCase())){
+    state.brainChats = [];
+    if(state.v87) state.v87.pending = null;
+    if(state.v89) state.v89.attachments = [];
+    saveState();
+    renderV92AI();
+    return;
+  }
+
+  if(["send to invoices","send to invoice","save to invoice","save to invoices"].includes(text.toLowerCase())){
+    const ok = typeof v87SavePending === "function" && v87SavePending("invoice");
+    state.brainChats.push({role:"ai", text: ok ? "Done. I sent that preview to Invoices." : "No preview found. Build an invoice first.", date:new Date().toLocaleString()});
+    saveState();
+    renderV92AI();
+    return;
+  }
+
+  if(["send to quotes","send to quote","save to quote","save to quotes"].includes(text.toLowerCase())){
+    const ok = typeof v87SavePending === "function" && v87SavePending("quote");
+    state.brainChats.push({role:"ai", text: ok ? "Done. I sent that preview to Quotes." : "No preview found. Build a quote first.", date:new Date().toLocaleString()});
+    saveState();
+    renderV92AI();
+    return;
+  }
+
+  state.brainChats.push({ role:"user", text: text || "Attached file(s)", date:new Date().toLocaleString() });
+
+  if(files.length && files[0] && files[0].type && files[0].type.startsWith("image/")){
+    state.brainChats.push({role:"user", text:"", kind:"attachment", meta:files[0], date:new Date().toLocaleString()});
+  }
+
+  const intent = typeof v87Intent === "function" ? v87Intent(text) : "general";
+  if((intent === "invoice" || intent === "quote") && typeof v87BuildPreview === "function"){
+    const p = v87BuildPreview(text, intent);
+    state.v87 = state.v87 || {};
+    state.v87.pending = p;
+    const msg = "I built a " + intent + " preview. Review it first. If it looks good, say “send to invoices” or “send to quotes”.";
+    state.brainChats.push({role:"ai", text:msg, html: typeof v91FormatPlainText==="function" ? v91FormatPlainText(msg) : msg, date:new Date().toLocaleString()});
+    state.brainChats.push({role:"ai", text:"preview", kind:"preview", meta:p, date:new Date().toLocaleString()});
+    if(state.v89) state.v89.attachments = [];
+    saveState();
+    renderV92AI();
+    return;
+  }
+
+  try {
+    const ans = await rw92AskBackend(text, files);
+    state.brainChats.push({
+      role:"ai",
+      text: ans,
+      html: typeof v91FormatPlainText === "function" ? v91FormatPlainText(ans) : ans,
+      date:new Date().toLocaleString()
+    });
+  } catch(e) {
+    const fallback = "Backend error: " + e.message + "\n\nThe backend is live, but this request failed. Check Render logs and API keys.";
+    state.brainChats.push({
+      role:"ai",
+      text:fallback,
+      html: typeof v91FormatPlainText === "function" ? v91FormatPlainText(fallback) : fallback,
+      date:new Date().toLocaleString()
+    });
+  }
+
+  if(state.v89) state.v89.attachments = [];
+  saveState();
+  renderV92AI();
+}
+
+function rw92RenderMessage(m){
+  if(m.kind === "preview" && typeof v87PreviewHtml === "function") return v87PreviewHtml(m.meta);
+  if(m.kind === "attachment" && typeof v89AttachmentPreviewHtml === "function") return v89AttachmentPreviewHtml(m.meta);
+  if(typeof v91RenderMessage === "function") return v91RenderMessage(m);
+  return '<div class="msg '+(m.role==="user"?"user":"ai")+'"><b>'+(m.role==="user"?"You":"RW AI")+'</b>'+String(m.text||"").replace(/\n/g,"<br>")+'</div>';
+}
+
+function renderV92AI(){
+  rw92EnsureBackend();
+  document.body.classList.add("rw-ai-mode");
+  state.brainChats = state.brainChats || [];
+  const ctx = (state.truck && state.truck.customer ? state.truck.customer : "No customer") + " • " + (state.truck && state.truck.unit ? state.truck.unit : "No truck") + " • " + (state.truck && state.truck.engine ? state.truck.engine : "Engine unknown");
+
+  $("#screen").innerHTML = '<section class="rw8-shell">' +
+    '<input id="v92FileInput" type="file" accept="image/*,.pdf,.txt,.csv,.json" multiple style="display:none">' +
+    '<div class="rw8-head"><div class="rw8-brand"><div class="rw8-logo">RW</div><div><b>Rolling Wrench AI</b><small>'+ctx+'</small></div></div><div><span class="ai-live-badge">AI Online</span><button class="clear" id="v92Clear">Clear</button><button id="v92Close">Close</button></div></div>' +
+    '<div class="rw8-thread" id="v92Thread">' +
+    '<div class="rw8-chips">' +
+    '<button data-v92-chip="How do I change a water pump on an X15?">X15 water pump</button>' +
+    '<button data-v92-chip="What is the weather today in Albion Indiana?">Weather</button>' +
+    '<button data-v92-chip="Build me an invoice for replacing water pump and belt">Invoice</button>' +
+    '<button data-v92-chip="Build me a quote for clutch replacement on a 2014 Peterbilt ISX">Quote</button>' +
+    '<button id="v92PhotoChip">Add Photo</button>' +
+    '</div>' +
+    (typeof v89AttachmentsHtml === "function" ? v89AttachmentsHtml() : "") +
+    (state.brainChats.map(rw92RenderMessage).join("") || '<div class="msg ai"><b>RW AI</b><div class="ai-rich-answer"><h2>AI Online</h2><p>Connected to the live Rolling Wrench AI backend.</p><ul><li>Ask diesel questions</li><li>Ask general questions</li><li>Build quotes/invoices</li><li>Add photos/files</li></ul></div></div>') +
+    '</div>' +
+    '<div class="rw8-compose"><button class="plus" id="v92Plus">+</button><div class="inputbox"><input id="v92Input" placeholder="Ask Rolling Wrench AI anything..."><button class="mic" id="v92Mic">🎙</button></div><button class="sendbtn" id="v92Send">➤</button></div>' +
+    '</section>';
+
+  if(typeof bindPageTools === "function") bindPageTools();
+  const th = $("#v92Thread"); if(th) th.scrollTop = th.scrollHeight;
+
+  $("#v92Send").onclick = function(){ rw92RunAI($("#v92Input").value); };
+  $("#v92Input").onkeydown = function(e){ if(e.key === "Enter") rw92RunAI($("#v92Input").value); };
+  $("#v92Clear").onclick = function(){ state.brainChats = []; saveState(); renderV92AI(); };
+  $("#v92Close").onclick = function(){ document.body.classList.remove("rw-ai-mode"); setRoute("home"); };
+  $("#v92Plus").onclick = function(){ $("#v92FileInput").click(); };
+  $("#v92PhotoChip").onclick = function(){ $("#v92FileInput").click(); };
+  $("#v92FileInput").onchange = function(e){ if(typeof v89AddFiles === "function") v89AddFiles(e.target.files); };
+  $("#v92Mic").onclick = function(){ if(typeof startVoiceToField === "function") startVoiceToField("v92Input"); else $("#v92Input").focus(); };
+  $$("[data-v92-chip]").forEach(function(b){ b.onclick = function(){ rw92RunAI(b.dataset.v92Chip); }; });
+}
+
+window.renderV92AI = renderV92AI;
+window.renderV91AI = renderV92AI;
+window.renderV90A_AI = renderV92AI;
+window.renderV90AI = renderV92AI;
+window.renderV89AI = renderV92AI;
+window.renderV88AI = renderV92AI;
+window.renderV87AI = renderV92AI;
+window.renderRW8Brain = renderV92AI;
+
+setTimeout(function(){
+  rw92EnsureBackend();
+  const oldSetRouteV92 = window.setRoute || setRoute;
+  window.setRoute = function(route){
+    const r = String(route || "home").toLowerCase();
+    if(r === "ai" || r === "brain" || r === "rwai"){ location.hash = "brain"; renderV92AI(); return; }
+    oldSetRouteV92(route);
+  };
+},0);
