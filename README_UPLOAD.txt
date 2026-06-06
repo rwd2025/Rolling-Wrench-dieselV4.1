@@ -314,3 +314,5 @@ V9.0a FORCE AI BRAIN:
 - Removes old canned 'I'm following...' fallback text.
 - Adds local X15 water pump procedure answer.
 - Adds hard click override for [data-route=ai]/brain.
+
+V9.1 AI READABLE ANSWER FORMATTER: headings, bullets, ordered steps, callouts, and cards for repair answers.
