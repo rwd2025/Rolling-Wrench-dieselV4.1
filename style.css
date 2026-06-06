@@ -2097,3 +2097,5 @@ body.rw-ai-mode{
 
 /* ===== V9.2 LIVE BACKEND POLISH ===== */
 .ai-live-badge{border:1px solid rgba(45,224,113,.55)!important;background:#07160d!important;color:#d8ffe6!important;border-radius:999px;padding:5px 9px;font-size:11px;font-weight:900;text-transform:uppercase}
+
+/* V9.2a parts router fix */

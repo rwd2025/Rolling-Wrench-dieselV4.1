@@ -325,3 +325,9 @@ V9.2 LIVE BACKEND CONNECTION:
 - Parts Endpoint: /api/parts
 - AI screen shows AI Online instead of Local.
 - Preserves V9.1 readable formatter.
+
+V9.2a PARTS ROUTER FIX:
+- Part numbers like 3101874 route to /api/parts.
+- "cross reference", "part number", "OEM", "P/N", "xref" route to /api/parts.
+- Weather words route to /api/search.
+- Keeps V9.2 live backend connection.

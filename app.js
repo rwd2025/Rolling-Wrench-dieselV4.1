@@ -5400,3 +5400,80 @@ setTimeout(function(){
     oldSetRouteV92(route);
   };
 },0);
+
+
+/* ===== V9.2a PARTS ROUTER FIX ===== */
+function rw92aLooksLikeParts(q){
+  const s = String(q || "").toLowerCase();
+  return (
+    /\b\d{5,}\b/.test(s) ||
+    s.includes("cross reference") ||
+    s.includes("cross-reference") ||
+    s.includes("xref") ||
+    s.includes("part number") ||
+    s.includes("part #") ||
+    s.includes("p/n") ||
+    s.includes(" pn") ||
+    s.includes("oem") ||
+    s.includes("fleetguard") ||
+    s.includes("baldwin") ||
+    s.includes("donaldson") ||
+    s.includes("napa") ||
+    s.includes("cummins part") ||
+    s.includes("water pump") ||
+    s.includes("belt") ||
+    s.includes("clutch") ||
+    s.includes("supplier")
+  );
+}
+function rw92aLooksLikeWeather(q){
+  const s = String(q || "").toLowerCase();
+  return (
+    s.includes("weather") ||
+    s.includes("temperature") ||
+    s.includes("forecast") ||
+    s.includes("rain") ||
+    s.includes("snow") ||
+    s.includes("wind")
+  );
+}
+async function rw92aAskBackend(prompt, files){
+  rw92EnsureBackend();
+  const q = String(prompt || "");
+  const context = {
+    truck: state.truck || {},
+    settings: state.settings || {},
+    pending: state.v87 ? state.v87.pending : null,
+    recentQuotes: (state.quotes || []).slice(-5),
+    recentInvoices: (state.invoices || []).slice(-5),
+    repairMemory: (state.repairMemory || []).slice(0,10)
+  };
+
+  let url = state.backend.aiEndpoint;
+  let routeName = "ai";
+
+  if(files && files.length && state.backend.visionEndpoint){
+    url = state.backend.visionEndpoint;
+    routeName = "vision";
+  } else if(rw92aLooksLikeParts(q) && state.backend.partsEndpoint){
+    url = state.backend.partsEndpoint;
+    routeName = "parts";
+  } else if(rw92aLooksLikeWeather(q) && state.backend.webEndpoint){
+    url = state.backend.webEndpoint;
+    routeName = "search";
+  }
+
+  const data = await rw92Post(url, {
+    prompt: q,
+    question: q,
+    route: routeName,
+    context: context,
+    files: files || []
+  });
+
+  return data.answer || data.text || data.message || data.content || JSON.stringify(data, null, 2);
+}
+
+/* Force all current and future calls to use fixed router. */
+window.rw92AskBackend = rw92aAskBackend;
+try { rw92AskBackend = rw92aAskBackend; } catch(e) {}
