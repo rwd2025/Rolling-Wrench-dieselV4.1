@@ -4797,3 +4797,225 @@ function renderV89AI(){
     oldSetRouteV89(route);
   };
 })();
+
+
+/* ===== V9.0 REAL AI BRAIN ===== */
+function v90Ensure(){
+  if(typeof v89Ensure==="function") v89Ensure();
+  state.backend = Object.assign({
+    provider:"openai",
+    aiEndpoint:"",
+    aiKey:"",
+    model:"gpt-4o-mini",
+    visionEndpoint:"",
+    visionKey:""
+  }, state.backend||{});
+}
+function v90X15WaterPump(){
+  return `Here’s the field procedure for changing a water pump on a Cummins X15 / ISX-style setup.
+
+Safety:
+1. Let engine cool completely.
+2. Drain coolant below pump level.
+3. Disconnect batteries if working near fan/belts.
+4. Save coolant only if clean and approved to reuse.
+
+Steps:
+1. Take a picture of belt routing.
+2. Remove serpentine belt.
+3. Remove shroud/access panels as needed.
+4. Remove hoses/coolant pipe/brackets blocking the pump.
+5. Remove pump pulley if required.
+6. Remove water pump bolts.
+7. Pull pump straight out and catch coolant.
+8. Clean sealing surface without gouging it.
+9. Compare old pump to new pump: impeller, pulley offset, ports, bolt pattern.
+10. Install new O-ring/gasket. Lightly lube O-ring with coolant if applicable.
+11. Install pump and torque evenly to OEM spec.
+12. Reinstall pulley, hoses, brackets, and belt.
+13. Refill coolant.
+14. Pressure test cooling system.
+15. Start engine, check leaks, check belt tracking.
+16. Bring to temp, road test, cool down, recheck coolant level.
+
+Inspect while there:
+- Belt, tensioner, idlers
+- Fan hub/fan clutch play
+- Coolant hoses
+- Thermostat housing leaks
+- Surge tank/cap
+
+Questions:
+Is this a 2019 International ProStar with X15?
+Are you replacing it for a leak, noise, overheating, or coolant loss?`;
+}
+function v90LocalAnswer(text){
+  const q=String(text||"").toLowerCase();
+  if((q.includes("water pump") || q.includes("waterpump")) && (q.includes("x15") || q.includes("x 15") || q.includes("isx"))) return v90X15WaterPump();
+  if(q.includes("low boost") || q.includes("underboost")){
+    return `Low boost on a Cummins X15 is commonly caused by:
+1. CAC leak / boot split / loose clamp
+2. Exhaust leak before turbo
+3. VGT actuator or stuck turbo vanes
+4. Bad MAP/boost sensor
+5. Intake restriction
+6. EGR valve stuck open
+7. Fuel restriction
+8. Aftertreatment derate/restriction
+
+Checks:
+- Check boost under load.
+- Pressure test CAC.
+- Run VGT sweep.
+- Compare commanded vs actual turbo position.
+- Check MAP KOEO vs baro.`;
+  }
+  if(q.includes("spn") || q.includes("fmi")) return `Send me the exact SPN/FMI, engine, active/inactive status, and symptoms. I’ll break down causes and test steps.`;
+  if(q.includes("invoice") || q.includes("quote")) return "";
+  return `AI backend is not connected yet. I can still answer common diesel procedures and build invoice/quote previews. Add your AI endpoint/key in Backend Connections for full ChatGPT/Gemini-style answers.`;
+}
+async function v90CallAI(text, files){
+  v90Ensure();
+  if(!state.backend.aiEndpoint) return "";
+  const payload={
+    provider:state.backend.provider,
+    model:state.backend.model,
+    prompt:text,
+    messages:[
+      {role:"system",content:"You are Rolling Wrench AI. Answer anything like ChatGPT/Gemini/Google. You are also a diesel/gas mechanic assistant and service advisor. Give clear steps, warnings, parts/tools, and follow-up questions."},
+      {role:"user",content:text}
+    ],
+    context:typeof v88Context==="function"?v88Context():{},
+    files:files||[]
+  };
+  const data=await v88Post(state.backend.aiEndpoint,state.backend.aiKey,payload);
+  return data.answer||data.text||data.message||data.content||JSON.stringify(data,null,2);
+}
+async function v90RunAI(text){
+  v90Ensure();
+  text=String(text||"").trim();
+  const files=state.v89?.attachments||[];
+  if(!text && !files.length) return;
+  const low=text.toLowerCase();
+  if(["clear","clear chat","new chat"].includes(low)){
+    state.brainChats=[]; if(state.v87)state.v87.pending=null; if(state.v89)state.v89.attachments=[]; saveState(); renderV90AI(); return;
+  }
+  if(["send to invoices","send to invoice","save to invoice","save to invoices"].includes(low)){
+    const ok=typeof v87SavePending==="function" && v87SavePending("invoice");
+    v87Push("ai",ok?"Done. I sent that preview to Invoices.":"No preview found. Build an invoice first.");
+    renderV90AI(); return;
+  }
+  if(["send to quotes","send to quote","save to quote","save to quotes"].includes(low)){
+    const ok=typeof v87SavePending==="function" && v87SavePending("quote");
+    v87Push("ai",ok?"Done. I sent that preview to Quotes.":"No preview found. Build a quote first.");
+    renderV90AI(); return;
+  }
+  v87Push("user",text||"Attached file(s)");
+  if(files.length && files[0]?.type?.startsWith("image/")){
+    state.brainChats.push({role:"user",text:"",kind:"attachment",meta:files[0],date:new Date().toLocaleString()});
+  }
+  const intent=typeof v87Intent==="function"?v87Intent(text):"general";
+  if(intent==="invoice" || intent==="quote"){
+    const p=v87BuildPreview(text,intent);
+    state.v87.pending=p;
+    v87Push("ai",`I built a ${intent} preview. Review it first. If it looks good, say “send to invoices” or “send to quotes”.`);
+    v87Push("ai","preview","preview",p);
+    if(state.v89)state.v89.attachments=[];
+    saveState(); renderV90AI(); return;
+  }
+  try{
+    let ans="";
+    if(files.length && state.backend.visionEndpoint){
+      const data=await v88Post(state.backend.visionEndpoint,state.backend.visionKey,{prompt:text||"Analyze this image/file",files,context:typeof v88Context==="function"?v88Context():{}});
+      ans=data.answer||data.text||data.message||JSON.stringify(data,null,2);
+    }else{
+      ans=await v90CallAI(text,files);
+    }
+    v87Push("ai",ans||v90LocalAnswer(text));
+  }catch(e){
+    v87Push("ai",v90LocalAnswer(text)+"\n\nBackend error: "+e.message);
+  }
+  if(state.v89)state.v89.attachments=[];
+  saveState(); renderV90AI();
+}
+function renderV90AI(){
+  v90Ensure();
+  document.body.classList.add("rw-ai-mode");
+  const ctx=`${state.truck?.customer||"No customer"} • ${state.truck?.unit||"No truck"} • ${state.truck?.engine||"Engine unknown"}`;
+  const live=state.backend.aiEndpoint?`<span class="ai-live-badge">AI Connected</span>`:`<span class="ai-offline-badge">Local</span>`;
+  $("#screen").innerHTML=`<section class="rw8-shell">
+    <input id="v90FileInput" type="file" accept="image/*,.pdf,.txt,.csv,.json" multiple style="display:none">
+    <div class="rw8-head"><div class="rw8-brand"><div class="rw8-logo">RW</div><div><b>Rolling Wrench AI</b><small>${ctx}</small></div></div><div>${live}<button class="clear" id="v90Clear">Clear</button><button id="v90Close">Close</button></div></div>
+    <div class="rw8-thread" id="v90Thread">
+      <div class="rw8-chips">
+        <button data-v90-chip="How do I change a water pump on an X15?">X15 water pump</button>
+        <button data-v90-chip="Build me an invoice for replacing water pump and belt">Invoice</button>
+        <button data-v90-chip="Build me a quote for clutch replacement on a 2014 Peterbilt ISX">Quote</button>
+        <button id="v90PhotoChip">Add Photo</button>
+        <button data-route="backendconnections">Backend</button>
+      </div>
+      ${typeof v89AttachmentsHtml==="function"?v89AttachmentsHtml():""}
+      ${(state.brainChats||[]).map(m=>{
+        if(m.kind==="preview"&&typeof v87PreviewHtml==="function") return v87PreviewHtml(m.meta);
+        if(m.kind==="attachment"&&typeof v89AttachmentPreviewHtml==="function") return v89AttachmentPreviewHtml(m.meta);
+        return `<div class="msg ${m.role==="user"?"user":"ai"}"><b>${m.role==="user"?"You":"RW AI"}</b>${String(m.text||"").replace(/\\n/g,"\n")}</div>`;
+      }).join("")||`<div class="msg ai"><b>RW AI</b>Ask me anything. Without backend I can still answer common diesel procedures and build quote/invoice previews.</div>`}
+    </div>
+    <div class="rw8-compose"><button class="plus" id="v90Plus">+</button><div class="inputbox"><input id="v90Input" placeholder="Ask Rolling Wrench AI anything..."><button class="mic" id="v90Mic">🎙</button></div><button class="sendbtn" id="v90Send">➤</button></div>
+  </section>`;
+  if(typeof bindPageTools==="function") bindPageTools();
+  const th=$("#v90Thread"); if(th) th.scrollTop=th.scrollHeight;
+  $("#v90Send").onclick=()=>v90RunAI($("#v90Input").value);
+  $("#v90Input").onkeydown=e=>{if(e.key==="Enter")v90RunAI($("#v90Input").value);};
+  $("#v90Clear").onclick=()=>{state.brainChats=[];if(state.v87)state.v87.pending=null;if(state.v89)state.v89.attachments=[];saveState();renderV90AI();};
+  $("#v90Close").onclick=()=>{document.body.classList.remove("rw-ai-mode");setRoute("home");};
+  $("#v90Plus").onclick=()=>$("#v90FileInput").click();
+  $("#v90PhotoChip").onclick=()=>$("#v90FileInput").click();
+  $("#v90FileInput").onchange=e=>v89AddFiles(e.target.files);
+  $("#v90Mic").onclick=()=>{if(typeof startVoiceToField==="function")startVoiceToField("v90Input");else $("#v90Input").focus();};
+  $$("[data-v90-chip]").forEach(b=>b.onclick=()=>v90RunAI(b.dataset.v90Chip));
+}
+function renderV90BackendConnections(){
+  v90Ensure();
+  $("#screen").innerHTML = `${pageHead("Real AI Backend","saveV90Backend")}
+  <section class="backend-box">
+    <h3>AI Provider</h3>
+    <div class="v90-provider-grid">
+      ${["openai","gemini","claude","openrouter"].map(p=>`<button class="v90-provider ${state.backend.provider===p?"active":""}" data-v90-provider="${p}">${p.toUpperCase()}</button>`).join("")}
+    </div>
+  </section>
+  <section class="backend-box form-grid">
+    <h3>AI Endpoint</h3>
+    <small>Your backend should accept POST JSON and return answer/text/message.</small>
+    <label>Endpoint<input id="v90AiEndpoint" value="${state.backend.aiEndpoint||""}" placeholder="https://your-backend.com/ai"></label>
+    <label>API Key<input id="v90AiKey" value="${state.backend.aiKey||""}" placeholder="Backend key"></label>
+    <label>Model<input id="v90Model" value="${state.backend.model||"gpt-4o-mini"}"></label>
+  </section>
+  <section class="backend-box form-grid">
+    <h3>Vision / Photo Endpoint</h3>
+    <label>Vision Endpoint<input id="v90VisionEndpoint" value="${state.backend.visionEndpoint||""}"></label>
+    <label>Vision Key<input id="v90VisionKey" value="${state.backend.visionKey||""}"></label>
+  </section>
+  <section class="backend-box">
+    <h3>Test</h3>
+    <div class="backend-test-row"><label>Question<input id="v90TestQuestion" value="How do I change a water pump on an X15?"></label><button class="v86-btn primary" id="v90TestBtn">Test</button></div>
+    <div class="backend-output" id="v90Out">${state.v88?.lastBackendTest||"No test yet."}</div>
+  </section>
+  <section class="${state.backend.aiEndpoint?"v90-ok":"v90-warning"}">${state.backend.aiEndpoint?"AI endpoint saved.":"No backend connected yet. Local diesel fallback is active."}</section>`;
+  if(typeof bindPageTools==="function") bindPageTools();
+  $$("[data-v90-provider]").forEach(b=>b.onclick=()=>{state.backend.provider=b.dataset.v90Provider;saveState();renderV90BackendConnections();});
+  $("#saveV90Backend").onclick=()=>{state.backend.aiEndpoint=v90AiEndpoint.value;state.backend.aiKey=v90AiKey.value;state.backend.model=v90Model.value;state.backend.visionEndpoint=v90VisionEndpoint.value;state.backend.visionKey=v90VisionKey.value;saveState();if(typeof toast==="function")toast("AI backend saved");renderV90BackendConnections();};
+  $("#v90TestBtn").onclick=async()=>{v90Out.textContent="Testing...";try{const a=await v90CallAI(v90TestQuestion.value,[]);v90Out.textContent=a||v90LocalAnswer(v90TestQuestion.value);state.v88=state.v88||{};state.v88.lastBackendTest=v90Out.textContent;saveState();}catch(e){v90Out.textContent=v90LocalAnswer(v90TestQuestion.value)+"\n\nBackend error: "+e.message;}};
+}
+
+
+/* V9.0 AI route */
+(function(){
+  const oldSetRouteV90 = window.setRoute || setRoute;
+  window.setRoute = function(route){
+    const r=String(route||"home").toLowerCase();
+    if(r==="ai" || r==="brain"){ location.hash="brain"; renderV90AI(); return; }
+    if(r==="backendconnections" || r==="backend" || r==="brainsettings"){ location.hash="backendconnections"; renderV90BackendConnections(); return; }
+    oldSetRouteV90(route);
+  };
+})();

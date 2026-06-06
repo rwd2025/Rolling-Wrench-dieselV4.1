@@ -2075,3 +2075,10 @@ body.rw-ai-mode{
 .ai-attach-preview{border:1px solid rgba(104,121,139,.45);background:#071018;border-radius:16px;padding:8px;margin:8px 0}
 .ai-attach-preview img{max-width:100%;border-radius:12px;display:block}.ai-attach-preview small{color:#9aa8b6;display:block;margin-top:6px}
 @media(max-width:390px){.rw8-compose{grid-template-columns:40px minmax(0,1fr) 42px!important;gap:5px!important}.plus{width:40px!important;height:40px!important;min-width:40px!important}.sendbtn{width:42px!important;height:40px!important;min-width:42px!important}.inputbox{height:40px!important}.inputbox input{font-size:14px!important}}
+
+/* ===== V9.0 REAL AI BRAIN ===== */
+.v90-provider-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.v90-provider{border:1px solid rgba(104,121,139,.45);background:#101923;color:#fff;border-radius:16px;padding:12px;font-weight:900;text-align:center}
+.v90-provider.active{border-color:#ff7a18;background:linear-gradient(145deg,#ff8c21,#9b4308)}
+.v90-warning{border:1px solid rgba(255,180,75,.5);background:#211807;color:#ffe7b4;border-radius:16px;padding:12px;margin:10px 0}
+.v90-ok{border:1px solid rgba(45,224,113,.5);background:#07160d;color:#d8ffe6;border-radius:16px;padding:12px;margin:10px 0}

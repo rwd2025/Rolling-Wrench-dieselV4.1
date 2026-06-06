@@ -299,3 +299,12 @@ V8.9 AI ATTACHMENTS + SEND BUTTON FIX:
 - Supports images, PDF, text/CSV/JSON file selection.
 - Shows attached file chips and image preview in chat.
 - Sends attachments to Vision backend if configured.
+
+V9.0 REAL AI BRAIN:
+- Replaces canned fallback with local diesel answers and backend-first AI.
+- Adds X15/ISX water pump procedure fallback.
+- Adds provider settings: OpenAI, Gemini, Claude, OpenRouter.
+- AI endpoint test screen.
+- Vision/photo endpoint retained.
+- Quote/invoice preview workflow retained.
+- No startup recovery/login/router hacks.
