@@ -4700,3 +4700,100 @@ window.addEventListener("load", function(){
     oldSetRouteV88(route);
   };
 })();
+
+
+/* ===== V8.9 AI ATTACHMENTS ===== */
+function v89Ensure(){
+  if(typeof v88Ensure==="function") v88Ensure();
+  state.v89=state.v89||{attachments:[]};
+  state.v89.attachments=Array.isArray(state.v89.attachments)?state.v89.attachments:[];
+}
+function v89FileToDataUrl(file){
+  return new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=reject;r.readAsDataURL(file);});
+}
+async function v89AddFiles(files){
+  v89Ensure();
+  for(const f of [...(files||[])].slice(0,6)){
+    const data=await v89FileToDataUrl(f);
+    state.v89.attachments.push({id:Date.now()+"-"+Math.random().toString(16).slice(2),name:f.name||"attachment",type:f.type||"file",size:f.size||0,data,date:new Date().toLocaleString()});
+  }
+  saveState(); renderV89AI();
+}
+function v89AttachmentsHtml(){
+  v89Ensure();
+  if(!state.v89.attachments.length) return "";
+  return `<div class="ai-attach-row">${state.v89.attachments.map(a=>`<div class="ai-attach-chip">📎 ${a.name}</div>`).join("")}<button class="ai-attach-chip" id="v89ClearAttach">Clear</button></div>`;
+}
+function v89AttachmentPreviewHtml(att){
+  if(!att) return "";
+  if(String(att.type||"").startsWith("image/")) return `<div class="ai-attach-preview"><img src="${att.data}"><small>${att.name}</small></div>`;
+  return `<div class="ai-attach-preview"><small>📎 ${att.name}</small></div>`;
+}
+async function v89RunAI(text){
+  v89Ensure();
+  text=String(text||"").trim();
+  const files=state.v89.attachments||[];
+  if(!text && !files.length) return;
+  if(["clear","clear chat","new chat"].includes(text.toLowerCase())){
+    state.brainChats=[]; if(state.v87)state.v87.pending=null; state.v89.attachments=[]; saveState(); renderV89AI(); return;
+  }
+  if(files.length){
+    if(typeof v87Push==="function") v87Push("user",(text||"Attached file(s)")+"\\n"+files.map(f=>"Attached: "+f.name).join("\\n"));
+    const first=files[0];
+    if(first && first.type && first.type.startsWith("image/")) state.brainChats.push({role:"user",text:"",kind:"attachment",meta:first,date:new Date().toLocaleString()});
+    if(typeof v88Has==="function" && v88Has(state.backend?.visionEndpoint)){
+      try{
+        const ans=await v88Post(state.backend.visionEndpoint,state.backend.visionKey,{prompt:text||"Analyze this attachment",files,context:v88Context()});
+        v87Push("ai",ans.answer||ans.text||ans.message||JSON.stringify(ans,null,2));
+      }catch(e){v87Push("ai","Picture attached, but Vision backend failed: "+e.message);}
+    }else{
+      v87Push("ai","Picture/file attached. To analyze it like ChatGPT/Gemini, connect the Vision backend in Backend Connections. I can still keep it in the chat for now.");
+    }
+    state.v89.attachments=[]; saveState(); renderV89AI(); return;
+  }
+  if(typeof v88RunAI==="function") return v88RunAI(text);
+  if(typeof v87RunAI==="function") return v87RunAI(text);
+}
+function renderV89AI(){
+  v89Ensure();
+  document.body.classList.add("rw-ai-mode");
+  const ctx=`${state.truck?.customer||"No customer"} • ${state.truck?.unit||"No truck"} • ${state.truck?.engine||"Engine unknown"}`;
+  const live=(typeof v88Has==="function"&&v88Has(state.backend?.aiEndpoint))?`<span class="ai-live-badge">AI Connected</span>`:`<span class="ai-offline-badge">Setup Needed</span>`;
+  $("#screen").innerHTML=`<section class="rw8-shell">
+    <input id="v89FileInput" type="file" accept="image/*,.pdf,.txt,.csv,.json" multiple style="display:none">
+    <div class="rw8-head"><div class="rw8-brand"><div class="rw8-logo">RW</div><div><b>Rolling Wrench AI</b><small>${ctx}</small></div></div><div>${live}<button class="clear" id="v89Clear">Clear</button><button id="v89Close">Close</button></div></div>
+    <div class="rw8-thread" id="v89Thread">
+      <div class="rw8-chips"><button data-v89-chip="Build me an invoice for replacing water pump and belt">Invoice</button><button data-v89-chip="Build me a quote for clutch replacement on a 2014 Peterbilt ISX">Quote</button><button data-v89-chip="How do I change a water pump on X15?">Ask</button><button id="v89PhotoChip">Add Photo</button><button data-route="backendconnections">Backend</button></div>
+      ${v89AttachmentsHtml()}
+      ${(state.brainChats||[]).map(m=>{
+        if(m.kind==="preview"&&typeof v87PreviewHtml==="function") return v87PreviewHtml(m.meta);
+        if(m.kind==="attachment") return v89AttachmentPreviewHtml(m.meta);
+        return `<div class="msg ${m.role==="user"?"user":"ai"}"><b>${m.role==="user"?"You":"RW AI"}</b>${String(m.text||"").replace(/\\n/g,"\\n")}</div>`;
+      }).join("")||`<div class="msg ai"><b>RW AI</b>Tap + to add photos/files like ChatGPT. I’ll analyze images when Vision backend is connected.</div>`}
+    </div>
+    <div class="rw8-compose"><button class="plus" id="v89Plus">+</button><div class="inputbox"><input id="v89Input" placeholder="Ask Rolling Wrench AI anything..."><button class="mic" id="v89Mic">🎙</button></div><button class="sendbtn" id="v89Send">➤</button></div>
+  </section>`;
+  if(typeof bindPageTools==="function") bindPageTools();
+  const th=$("#v89Thread"); if(th) th.scrollTop=th.scrollHeight;
+  $("#v89Send").onclick=()=>v89RunAI($("#v89Input").value);
+  $("#v89Input").onkeydown=e=>{if(e.key==="Enter")v89RunAI($("#v89Input").value);};
+  $("#v89Clear").onclick=()=>{state.brainChats=[]; if(state.v87)state.v87.pending=null; state.v89.attachments=[]; saveState(); renderV89AI();};
+  $("#v89Close").onclick=()=>{document.body.classList.remove("rw-ai-mode");setRoute("home");};
+  $("#v89Plus").onclick=()=>$("#v89FileInput").click();
+  $("#v89PhotoChip").onclick=()=>$("#v89FileInput").click();
+  $("#v89FileInput").onchange=e=>v89AddFiles(e.target.files);
+  $("#v89Mic").onclick=()=>{if(typeof startVoiceToField==="function")startVoiceToField("v89Input");else $("#v89Input").focus();};
+  const ca=$("#v89ClearAttach"); if(ca) ca.onclick=()=>{state.v89.attachments=[];saveState();renderV89AI();};
+  $$("[data-v89-chip]").forEach(b=>b.onclick=()=>v89RunAI(b.dataset.v89Chip));
+}
+
+
+/* V8.9 AI attachment route */
+(function(){
+  const oldSetRouteV89 = window.setRoute || setRoute;
+  window.setRoute = function(route){
+    const r=String(route||"home").toLowerCase();
+    if(r==="ai" || r==="brain"){ location.hash="brain"; renderV89AI(); return; }
+    oldSetRouteV89(route);
+  };
+})();

@@ -292,3 +292,10 @@ V8.8 REAL AI BACKEND CONNECTIONS:
 - Web/parts questions route to web/parts endpoints when configured.
 - Quote/invoice preview workflow still works before saving to modules.
 NOTE: This frontend cannot answer literally anything by itself. Connect a real backend AI/search/vision service to unlock ChatGPT/Gemini/Google-like behavior.
+
+V8.9 AI ATTACHMENTS + SEND BUTTON FIX:
+- Fixes AI send button off-screen on iPhone.
+- Adds + button file/photo attachment in AI chat.
+- Supports images, PDF, text/CSV/JSON file selection.
+- Shows attached file chips and image preview in chat.
+- Sends attachments to Vision backend if configured.
