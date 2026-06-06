@@ -308,3 +308,9 @@ V9.0 REAL AI BRAIN:
 - Vision/photo endpoint retained.
 - Quote/invoice preview workflow retained.
 - No startup recovery/login/router hacks.
+
+V9.0a FORCE AI BRAIN:
+- Forces every AI route/renderer to the fixed V9 brain.
+- Removes old canned 'I'm following...' fallback text.
+- Adds local X15 water pump procedure answer.
+- Adds hard click override for [data-route=ai]/brain.

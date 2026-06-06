@@ -4463,7 +4463,7 @@ function rw8Quote(text){const ctx=rw8Context(),low=String(text).toLowerCase();le
 function rw8Push(role,text,kind,meta){state.brainChats.push({role,text:rw8Clean(text),kind:kind||"",meta:meta||null,date:new Date().toLocaleString()});saveState();}
 function rw8RenderCard(card){if(!card)return"";if(card.type==="quote"){const q=card.quote;return `<div class="rw8-card"><h3>${q.title||"Quote Detected"}</h3><div class="rw8-kpis"><div class="rw8-kpi"><small>Labor</small><b>${q.hours} hrs</b></div><div class="rw8-kpi"><small>Service</small><b>${money(q.serviceCall)}</b></div><div class="rw8-kpi"><small>Total</small><b>${money(q.total)}</b></div></div><div class="rw8-msg ai" style="max-width:100%;margin:0;"><b>Parts</b>${q.parts}</div><div class="rw8-actions"><button class="primary" data-rw8-action="openQuote">Open Quote</button><button data-rw8-action="findParts">Find Parts</button><button data-rw8-action="sendQuote">Send Customer</button><button data-rw8-action="invoiceQuote">Build Invoice</button></div></div>`;}if(card.type==="diagnostic"){return `<div class="rw8-card"><h3>Diagnostic Interview</h3><div class="rw8-msg ai" style="max-width:100%;margin:0;"><b>Next Questions</b>${card.text}</div><div class="rw8-actions"><button class="primary" data-rw8-action="saveMemory">Save Memory</button><button data-rw8-action="openFault">Open Fault Doctor</button></div></div>`;}return"";}
 function rw8Diagnostic(text){return`I can help diagnose that.\n\nAnswer these:\n1. Is the code active or inactive?\n2. What engine and truck?\n3. Any recent repair?\n4. What are the live data readings?\n5. Does it happen loaded, idle, regen, or driving?\n\nThen I’ll narrow it down step by step.`;}
-async function rw8Run(text){rw8Ensure();text=String(text||"").trim();if(!text)return;const intent=rw8Intent(text);if(intent==="clear"){state.brainChats=[];saveState();renderRW8Brain();return;}if(intent==="open_quote"){setRoute("quotes");return;}if(intent==="parts_action"){setRoute("parts");return;}if(intent==="invoice_action"){setRoute("invoices");return;}rw8ExtractMemory(text);rw8Push("user",text);if(intent==="quote"){const q=rw8Quote(text);state.quotes.unshift(q);state.rw8.lastCard={type:"quote",quote:q};saveState();rw8Push("ai",`I found a ${q.title.toLowerCase()}.\n\nLabor: ${q.hours} hrs\nEstimated Total: ${money(q.total)}\n\nI saved a quote draft.`);rw8Push("ai","quote card","card",state.rw8.lastCard);}else if(intent==="diagnostic"){const d=rw8Diagnostic(text);state.notes.unshift({type:"AI Diagnostic",note:d,date:new Date().toLocaleString()});state.rw8.lastCard={type:"diagnostic",text:d};saveState();rw8Push("ai",d,"card",state.rw8.lastCard);}else if(intent==="invoice"){const ctx=rw8Context();state.invoices.unshift({customer:ctx.customer,truck:ctx.truck,work:text,total:0,status:"Draft",ai:true,date:new Date().toLocaleString()});saveState();rw8Push("ai","I built an invoice draft and saved it to Invoices.");}else if(intent==="memory"){const ctx=rw8Context();if(typeof ensureV691==="function")ensureV691();state.repairMemory.unshift({id:"MEM-RW8-"+Date.now(),title:text.slice(0,55),complaint:text,cause:"",correction:"",customer:ctx.customer,truck:ctx.truck,engine:ctx.engine,keywords:text,status:"Saved",date:new Date().toLocaleString(),ai:true});saveState();rw8Push("ai","Saved to Repair Memory.");}else if(intent==="vision"){rw8Push("ai","Open OCR/Vision and attach the photo. Once the real vision backend is connected, I’ll read the image like ChatGPT/Gemini.");}else{rw8Push("ai","I’m following. Tell me if you want a quote, invoice, work order, repair memory, parts lookup, or diagnostic steps.");}renderRW8Brain();}
+async function rw8Run(text){rw8Ensure();text=String(text||"").trim();if(!text)return;const intent=rw8Intent(text);if(intent==="clear"){state.brainChats=[];saveState();renderRW8Brain();return;}if(intent==="open_quote"){setRoute("quotes");return;}if(intent==="parts_action"){setRoute("parts");return;}if(intent==="invoice_action"){setRoute("invoices");return;}rw8ExtractMemory(text);rw8Push("user",text);if(intent==="quote"){const q=rw8Quote(text);state.quotes.unshift(q);state.rw8.lastCard={type:"quote",quote:q};saveState();rw8Push("ai",`I found a ${q.title.toLowerCase()}.\n\nLabor: ${q.hours} hrs\nEstimated Total: ${money(q.total)}\n\nI saved a quote draft.`);rw8Push("ai","quote card","card",state.rw8.lastCard);}else if(intent==="diagnostic"){const d=rw8Diagnostic(text);state.notes.unshift({type:"AI Diagnostic",note:d,date:new Date().toLocaleString()});state.rw8.lastCard={type:"diagnostic",text:d};saveState();rw8Push("ai",d,"card",state.rw8.lastCard);}else if(intent==="invoice"){const ctx=rw8Context();state.invoices.unshift({customer:ctx.customer,truck:ctx.truck,work:text,total:0,status:"Draft",ai:true,date:new Date().toLocaleString()});saveState();rw8Push("ai","I built an invoice draft and saved it to Invoices.");}else if(intent==="memory"){const ctx=rw8Context();if(typeof ensureV691==="function")ensureV691();state.repairMemory.unshift({id:"MEM-RW8-"+Date.now(),title:text.slice(0,55),complaint:text,cause:"",correction:"",customer:ctx.customer,truck:ctx.truck,engine:ctx.engine,keywords:text,status:"Saved",date:new Date().toLocaleString(),ai:true});saveState();rw8Push("ai","Saved to Repair Memory.");}else if(intent==="vision"){rw8Push("ai","Open OCR/Vision and attach the photo. Once the real vision backend is connected, I’ll read the image like ChatGPT/Gemini.");}else{rw8Push("ai","Tell me what you need. I can answer repair questions, build invoice/quote previews, or use the backend AI when connected.");}renderRW8Brain();}
 
 function rw8KeyboardSafeScroll(){
   setTimeout(()=>{
@@ -5019,3 +5019,165 @@ function renderV90BackendConnections(){
     oldSetRouteV90(route);
   };
 })();
+
+
+/* ===== V9.0a FORCE REAL AI ROUTE ===== */
+function v90aLocalAnswer(text){
+  const q=String(text||"").toLowerCase();
+  if((q.includes("water pump")||q.includes("waterpump")) && (q.includes("x15")||q.includes("x 15")||q.includes("isx"))){
+    return `Here’s how to change a water pump on a Cummins X15 / ISX style engine:
+
+Safety:
+1. Let the engine cool completely.
+2. Drain coolant below the pump level.
+3. Disconnect batteries if working around fan/belts.
+4. Catch coolant cleanly.
+
+Steps:
+1. Take a picture of belt routing.
+2. Remove serpentine belt.
+3. Remove fan shroud/access panels as needed.
+4. Remove hoses, coolant pipe, brackets, or pulley blocking the pump.
+5. Remove water pump bolts.
+6. Pull pump straight out and catch coolant.
+7. Clean sealing surface without gouging it.
+8. Compare old pump to new pump: impeller, pulley offset, ports, bolt pattern.
+9. Install new O-ring/gasket. Lightly lube O-ring with coolant if used.
+10. Install pump and torque bolts evenly to OEM spec.
+11. Reinstall pulley, hoses, brackets, and belt.
+12. Refill coolant.
+13. Pressure test cooling system.
+14. Start engine, check leaks, verify belt tracking.
+15. Bring to temp, road test, cool down, and recheck coolant level.
+
+Inspect while there:
+- Belt
+- Tensioner/idlers
+- Fan hub/fan clutch
+- Coolant hoses
+- Thermostat housing
+- Surge tank cap
+
+Question: are you replacing it because it is leaking, noisy, overheating, or losing coolant?`;
+  }
+  if(q.includes("low boost")||q.includes("underboost")){
+    return `Low boost on a Cummins X15 is commonly caused by:
+1. CAC leak / boot split / loose clamp
+2. Exhaust leak before turbo
+3. VGT actuator or stuck turbo vanes
+4. Bad MAP/boost sensor
+5. Intake restriction
+6. EGR valve stuck open
+7. Fuel restriction
+8. Aftertreatment derate/restriction
+
+Fast checks:
+- Check boost under load.
+- Pressure test CAC.
+- Run VGT sweep.
+- Compare commanded vs actual turbo position.
+- Check MAP KOEO against baro.`;
+  }
+  return `I can answer that once the real AI backend is connected. I can still build invoice/quote previews and answer common diesel questions locally.`;
+}
+async function v90aRun(text){
+  text=String(text||"").trim();
+  if(!text) return;
+  state.brainChats = state.brainChats || [];
+  if(["clear","clear chat","new chat"].includes(text.toLowerCase())){
+    state.brainChats=[];
+    saveState();
+    renderV90A_AI();
+    return;
+  }
+  state.brainChats.push({role:"user", text, date:new Date().toLocaleString()});
+  const low=text.toLowerCase();
+  if((low.includes("invoice")||low.includes("quote")) && typeof v87BuildPreview==="function"){
+    const type=low.includes("quote")?"quote":"invoice";
+    state.v87=state.v87||{};
+    const p=v87BuildPreview(text,type);
+    state.v87.pending=p;
+    state.brainChats.push({role:"ai", text:`I built a ${type} preview. Review it first. If it looks good, say “send to invoices” or “send to quotes”.`, date:new Date().toLocaleString()});
+    state.brainChats.push({role:"ai", text:"preview", kind:"preview", meta:p, date:new Date().toLocaleString()});
+  } else {
+    let ans="";
+    try{
+      if(state.backend && state.backend.aiEndpoint && typeof v88Post==="function"){
+        const data=await v88Post(state.backend.aiEndpoint,state.backend.aiKey||"",{
+          prompt:text,
+          messages:[
+            {role:"system",content:"You are Rolling Wrench AI. Answer anything like ChatGPT/Gemini. Give complete helpful answers."},
+            {role:"user",content:text}
+          ],
+          context: typeof v88Context==="function"?v88Context():{}
+        });
+        ans=data.answer||data.text||data.message||data.content||"";
+      }
+    }catch(e){
+      ans="";
+    }
+    state.brainChats.push({role:"ai", text:ans||v90aLocalAnswer(text), date:new Date().toLocaleString()});
+  }
+  saveState();
+  renderV90A_AI();
+}
+function renderV90A_AI(){
+  document.body.classList.add("rw-ai-mode");
+  state.brainChats = state.brainChats || [];
+  const ctx=`${state.truck?.customer||"No customer"} • ${state.truck?.unit||"No truck"} • ${state.truck?.engine||"Engine unknown"}`;
+  const live=state.backend?.aiEndpoint?`<span class="ai-live-badge">AI Connected</span>`:`<span class="ai-offline-badge">Local</span>`;
+  $("#screen").innerHTML=`<section class="rw8-shell">
+    <div class="rw8-head"><div class="rw8-brand"><div class="rw8-logo">RW</div><div><b>Rolling Wrench AI</b><small>${ctx}</small></div></div><div>${live}<button class="clear" id="v90aClear">Clear</button><button id="v90aClose">Close</button></div></div>
+    <div class="rw8-thread" id="v90aThread">
+      <div class="rw8-chips">
+        <button data-v90a-chip="How do I change a water pump on an X15?">X15 water pump</button>
+        <button data-v90a-chip="What causes low boost on a Cummins X15?">Low boost</button>
+        <button data-v90a-chip="Build me an invoice for replacing water pump and belt">Invoice</button>
+        <button data-v90a-chip="Build me a quote for clutch replacement on a 2014 Peterbilt ISX">Quote</button>
+        <button data-route="backendconnections">Backend</button>
+      </div>
+      ${state.brainChats.map(m=>{
+        if(m.kind==="preview" && typeof v87PreviewHtml==="function") return v87PreviewHtml(m.meta);
+        return `<div class="msg ${m.role==="user"?"user":"ai"}"><b>${m.role==="user"?"You":"RW AI"}</b>${String(m.text||"").replace(/\\n/g,"\n")}</div>`;
+      }).join("") || `<div class="msg ai"><b>RW AI</b>Ask me anything. I’ll answer here first, then send quotes/invoices only when you approve.</div>`}
+    </div>
+    <div class="rw8-compose"><button class="plus" id="v90aPlus">+</button><div class="inputbox"><input id="v90aInput" placeholder="Ask Rolling Wrench AI anything..."><button class="mic" id="v90aMic">🎙</button></div><button class="sendbtn" id="v90aSend">➤</button></div>
+  </section>`;
+  if(typeof bindPageTools==="function") bindPageTools();
+  const th=$("#v90aThread"); if(th) th.scrollTop=th.scrollHeight;
+  $("#v90aSend").onclick=()=>v90aRun($("#v90aInput").value);
+  $("#v90aInput").onkeydown=e=>{if(e.key==="Enter")v90aRun($("#v90aInput").value);};
+  $("#v90aClear").onclick=()=>{state.brainChats=[];saveState();renderV90A_AI();};
+  $("#v90aClose").onclick=()=>{document.body.classList.remove("rw-ai-mode");setRoute("home");};
+  $("#v90aPlus").onclick=()=>{ if(typeof renderV89AI==="function"){ renderV89AI(); setTimeout(()=>document.querySelector("#v89FileInput")?.click(),50); } };
+  $$("[data-v90a-chip]").forEach(b=>b.onclick=()=>v90aRun(b.dataset.v90aChip));
+}
+/* Override every known AI renderer to the fixed one */
+window.renderV90AI = renderV90A_AI;
+window.renderV89AI = renderV90A_AI;
+window.renderV88AI = renderV90A_AI;
+window.renderV87AI = renderV90A_AI;
+window.renderRW8Brain = renderV90A_AI;
+window.renderBrainV72 = renderV90A_AI;
+
+
+/* V9.0a hard AI route override */
+setTimeout(function(){
+  const prevSetRoute = window.setRoute || setRoute;
+  window.setRoute = function(route){
+    const r=String(route||"home").toLowerCase();
+    if(r==="ai" || r==="brain" || r==="rwai"){ location.hash="brain"; renderV90A_AI(); return; }
+    prevSetRoute(route);
+  };
+  document.addEventListener("click",function(e){
+    const el=e.target.closest("[data-route]");
+    if(!el) return;
+    const r=String(el.getAttribute("data-route")||"").toLowerCase();
+    if(r==="ai" || r==="brain" || r==="rwai"){
+      e.preventDefault();
+      e.stopPropagation();
+      location.hash="brain";
+      renderV90A_AI();
+    }
+  },true);
+},0);
