@@ -5534,3 +5534,82 @@ window.renderV93AI = renderV93AI;
 window.renderV92AI = renderV93AI;
 window.renderV91AI = renderV93AI;
 window.renderRW8Brain = renderV93AI;
+
+
+/* ===== V9.4 QUOTE SAVE / SEND TO QUOTES FIX ===== */
+function rw94PendingQuote(){
+  return (state.v87 && state.v87.pending) || state.pendingQuote || state.currentQuote || null;
+}
+function rw94SavePendingAs(type){
+  const p = rw94PendingQuote();
+  state.brainChats = state.brainChats || [];
+  if(!p){
+    state.brainChats.push({role:"ai", text:"No quote/invoice preview found. Build a quote first, then send it.", date:new Date().toLocaleString()});
+    if(typeof saveState === "function") saveState();
+    if(typeof renderV92AI === "function") renderV92AI();
+    return false;
+  }
+
+  const item = Object.assign({}, p);
+  item.id = item.id || Date.now();
+  item.date = item.date || new Date().toLocaleDateString();
+  item.createdAt = item.createdAt || new Date().toISOString();
+  item.customer = item.customer || (state.truck && state.truck.customer) || "Add customer";
+  item.truck = item.truck || (state.truck && (state.truck.unit || state.truck.vin)) || "No Active Truck";
+  item.engine = item.engine || (state.truck && state.truck.engine) || "Cummins X15";
+  item.status = type === "invoice" ? "Invoice Draft" : "Quote Draft";
+
+  if(type === "invoice"){
+    state.invoices = state.invoices || [];
+    state.invoices.unshift(item);
+    state.brainChats.push({role:"ai", text:"Done. I sent it to Invoices.", date:new Date().toLocaleString()});
+  } else {
+    state.quotes = state.quotes || [];
+    state.quotes.unshift(item);
+    state.brainChats.push({role:"ai", text:"Done. I sent it to Quotes.", date:new Date().toLocaleString()});
+  }
+
+  state.v87 = state.v87 || {};
+  state.v87.pending = null;
+  state.pendingQuote = null;
+  state.currentQuote = null;
+
+  if(typeof saveState === "function") saveState();
+  if(typeof renderV92AI === "function") renderV92AI();
+  return true;
+}
+
+window.v87SavePending = function(type){
+  return rw94SavePendingAs(type === "invoice" ? "invoice" : "quote");
+};
+try { v87SavePending = window.v87SavePending; } catch(e) {}
+
+document.addEventListener("click", function(e){
+  const btn = e.target.closest("button");
+  if(!btn) return;
+  const t = String(btn.textContent || "").toLowerCase().trim();
+  if(t.includes("send to quote")){
+    e.preventDefault();
+    e.stopPropagation();
+    rw94SavePendingAs("quote");
+  }
+  if(t.includes("send to invoice")){
+    e.preventDefault();
+    e.stopPropagation();
+    rw94SavePendingAs("invoice");
+  }
+}, true);
+
+const rw94OldRunAI = typeof rw92RunAI === "function" ? rw92RunAI : null;
+async function rw94RunAI(text){
+  const s = String(text || "").toLowerCase().trim();
+  if(["send to quotes","send to quote","save to quotes","save to quote","send quote to quotes"].includes(s)){
+    return rw94SavePendingAs("quote");
+  }
+  if(["send to invoices","send to invoice","save to invoices","save to invoice","build invoice from this quote"].includes(s)){
+    return rw94SavePendingAs("invoice");
+  }
+  if(rw94OldRunAI) return await rw94OldRunAI(text);
+}
+window.rw92RunAI = rw94RunAI;
+try { rw92RunAI = rw94RunAI; } catch(e) {}

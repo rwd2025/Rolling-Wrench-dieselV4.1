@@ -333,3 +333,10 @@ V9.2a PARTS ROUTER FIX:
 - Keeps V9.2 live backend connection.
 
 V9.3: Adds VIN chip, routes VINs to /api/vin, saves Active Truck.
+
+V9.4 QUOTE SAVE FIX:
+- Send to Quotes saves pending quote preview into state.quotes.
+- Send to Invoices saves pending preview into state.invoices.
+- Chat commands "send to quotes" and "send to invoices" work.
+- Buttons containing "Send to Quote(s)" or "Send to Invoice(s)" are intercepted correctly.
+- Manifest/cache bumped to v94.
