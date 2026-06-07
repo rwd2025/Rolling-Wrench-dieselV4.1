@@ -5477,3 +5477,60 @@ async function rw92aAskBackend(prompt, files){
 /* Force all current and future calls to use fixed router. */
 window.rw92AskBackend = rw92aAskBackend;
 try { rw92AskBackend = rw92aAskBackend; } catch(e) {}
+
+
+/* ===== V9.3 VIN DECODER + ACTIVE TRUCK MEMORY ===== */
+function rw93ExtractVin(text){
+  const m = String(text || "").toUpperCase().match(/[A-HJ-NPR-Z0-9]{17}/);
+  return m ? m[0] : "";
+}
+function rw93LooksLikeVin(text){
+  return !!rw93ExtractVin(text) || String(text || "").toLowerCase().includes("decode vin");
+}
+async function rw93AskVin(text){
+  const vin = rw93ExtractVin(text);
+  const data = await rw92Post(RW_LIVE_BACKEND_URL + "/api/vin", {
+    vin: vin,
+    prompt: text,
+    context: { truck: state.truck || {}, settings: state.settings || {} }
+  });
+  if(data.truck){
+    state.truck = Object.assign({}, state.truck || {}, data.truck);
+    state.truck.unit = state.truck.unit || ((data.truck.year || "") + " " + (data.truck.make || "")).trim();
+    state.trucks = state.trucks || [];
+    const exists = state.trucks.find(t => String(t.vin || "").toUpperCase() === String(data.truck.vin || "").toUpperCase());
+    if(!exists) state.trucks.unshift(state.truck);
+    if(typeof saveState === "function") saveState();
+  }
+  return data.answer || JSON.stringify(data, null, 2);
+}
+const rw93PreviousAskBackend = typeof rw92AskBackend === "function" ? rw92AskBackend : null;
+async function rw93AskBackend(prompt, files){
+  if(rw93LooksLikeVin(prompt) && !(files && files.length)) return await rw93AskVin(prompt);
+  if(rw93PreviousAskBackend) return await rw93PreviousAskBackend(prompt, files);
+  return await rw92Post(RW_LIVE_BACKEND_URL + "/api/ai", { prompt });
+}
+window.rw92AskBackend = rw93AskBackend;
+try { rw92AskBackend = rw93AskBackend; } catch(e) {}
+
+const rw93PreviousRender = typeof renderV92AI === "function" ? renderV92AI : null;
+function renderV93AI(){
+  if(rw93PreviousRender) rw93PreviousRender();
+  setTimeout(function(){
+    const chips = document.querySelector(".rw8-chips");
+    if(chips && !document.getElementById("rw93VinChip")){
+      const b = document.createElement("button");
+      b.id = "rw93VinChip";
+      b.textContent = "VIN";
+      b.onclick = function(){
+        const input = document.getElementById("v92Input");
+        if(input){ input.value = "Decode VIN "; input.focus(); }
+      };
+      chips.appendChild(b);
+    }
+  }, 50);
+}
+window.renderV93AI = renderV93AI;
+window.renderV92AI = renderV93AI;
+window.renderV91AI = renderV93AI;
+window.renderRW8Brain = renderV93AI;

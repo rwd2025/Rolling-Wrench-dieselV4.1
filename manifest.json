@@ -1,7 +1,7 @@
 {
-  "name": "Rolling Wrench AI Command Center V9.2a",
-  "short_name": "RWD AI V9.2a",
-  "start_url": "./index.html#home",
+  "name": "Rolling Wrench AI Command Center V9.3",
+  "short_name": "RWD AI V9.3",
+  "start_url": "./?v=93",
   "display": "standalone",
   "background_color": "#07090d",
   "theme_color": "#10131a",
@@ -16,5 +16,6 @@
       "sizes": "512x512",
       "type": "image/svg+xml"
     }
-  ]
+  ],
+  "scope": "./"
 }

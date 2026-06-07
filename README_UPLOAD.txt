@@ -331,3 +331,5 @@ V9.2a PARTS ROUTER FIX:
 - "cross reference", "part number", "OEM", "P/N", "xref" route to /api/parts.
 - Weather words route to /api/search.
 - Keeps V9.2 live backend connection.
+
+V9.3: Adds VIN chip, routes VINs to /api/vin, saves Active Truck.
