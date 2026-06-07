@@ -5741,3 +5741,211 @@ async function rw94aRunAI(text){
 }
 window.rw92RunAI = rw94aRunAI;
 try { rw92RunAI = rw94aRunAI; } catch(e) {}
+
+
+/* ===== V9.4b PORTABLE CUSTOMER QUOTE LINKS ===== */
+function rw94bB64Encode(obj){
+  try {
+    return btoa(unescape(encodeURIComponent(JSON.stringify(obj))));
+  } catch(e) {
+    return "";
+  }
+}
+function rw94bB64Decode(str){
+  try {
+    return JSON.parse(decodeURIComponent(escape(atob(String(str || "")))));
+  } catch(e) {
+    return null;
+  }
+}
+function rw94bGetHashParts(){
+  const raw = location.hash || "";
+  const noHash = raw.replace(/^#/,"");
+  const split = noHash.split("?");
+  return { route: split[0] || "", query: split[1] || "" };
+}
+function rw94bGetHashParam(name){
+  const q = rw94bGetHashParts().query;
+  const params = new URLSearchParams(q);
+  return params.get(name);
+}
+function rw94bCompactQuote(q){
+  return {
+    id: q.id || Date.now(),
+    approvalId: q.approvalId || "",
+    status: q.status || "Pending",
+    date: q.date || new Date().toLocaleDateString(),
+    customer: q.customer || "Customer",
+    truck: q.truck || "Truck",
+    engine: q.engine || "",
+    desc: q.desc || q.work || q.title || "Quote",
+    title: q.title || "Quote",
+    hours: q.hours || q.laborHours || 0,
+    rate: q.rate || q.laborRate || 0,
+    serviceCall: q.serviceCall || q.call || 0,
+    call: q.call || q.serviceCall || 0,
+    travel: q.travel || 0,
+    parts: q.parts || 0,
+    supplies: q.supplies || 0,
+    fees: q.fees || 0,
+    misc: q.misc || 0,
+    total: q.total || 0,
+    partsSource: q.partsSource || "",
+    partsList: q.partsList || q.parts || "",
+    disclaimer: q.disclaimer || ""
+  };
+}
+
+/* Override makeQuoteApproval so customer links contain quote payload. */
+window.makeQuoteApproval = function(quoteIndex){
+  ensureV63 && ensureV63();
+  const q = state.quotes && state.quotes[quoteIndex];
+  if(!q) return null;
+
+  const id = q.approvalId || ("RWQ-" + Date.now());
+  q.approvalId = id;
+  q.status = q.status || "Pending";
+
+  const compact = rw94bCompactQuote(q);
+  compact.approvalId = id;
+
+  const data = rw94bB64Encode(compact);
+  const link = `${location.origin}${location.pathname}#quoteapproval-${id}?q=${encodeURIComponent(data)}`;
+
+  state.quoteApprovals = state.quoteApprovals || [];
+  let rec = state.quoteApprovals.find(a => a.id === id);
+  if(!rec){
+    rec = {id, quoteIndex, link, status:q.status, created:new Date().toLocaleString(), customer:q.customer || "", total:q.total || 0};
+    state.quoteApprovals.unshift(rec);
+  } else {
+    Object.assign(rec, {quoteIndex, link, status:q.status, customer:q.customer || "", total:q.total || 0});
+  }
+
+  if(typeof saveState === "function") saveState();
+  return {id, link, quote:q};
+};
+try { makeQuoteApproval = window.makeQuoteApproval; } catch(e) {}
+
+function rw94bImportQuoteFromLink(id){
+  const payload = rw94bGetHashParam("q");
+  if(!payload) return null;
+  const q = rw94bB64Decode(payload);
+  if(!q) return null;
+
+  state.quotes = state.quotes || [];
+  state.quoteApprovals = state.quoteApprovals || [];
+
+  q.approvalId = q.approvalId || id;
+  q.status = q.status || "Pending";
+
+  let index = state.quotes.findIndex(x => x.approvalId === id);
+  if(index < 0){
+    state.quotes.unshift(q);
+    index = 0;
+  } else {
+    state.quotes[index] = Object.assign({}, state.quotes[index], q);
+  }
+
+  let rec = state.quoteApprovals.find(a => a.id === id);
+  const cleanLink = `${location.origin}${location.pathname}#quoteapproval-${id}?q=${encodeURIComponent(payload)}`;
+  if(!rec){
+    state.quoteApprovals.unshift({id, quoteIndex:index, link:cleanLink, status:q.status, customer:q.customer || "", total:q.total || 0, imported:true, created:new Date().toLocaleString()});
+  }
+
+  if(typeof saveState === "function") saveState();
+  return {quote:q, index};
+}
+
+/* Override quote finder so customer phone can load quote from link payload. */
+window.findQuoteByApprovalId = function(id){
+  ensureV63 && ensureV63();
+  state.quotes = state.quotes || [];
+  state.quoteApprovals = state.quoteApprovals || [];
+
+  let index = state.quotes.findIndex(q => q.approvalId === id);
+  if(index < 0){
+    const rec = state.quoteApprovals.find(a => a.id === id);
+    if(rec) index = rec.quoteIndex;
+  }
+  if(index >= 0 && state.quotes[index]) return {quote:state.quotes[index], index};
+
+  const imported = rw94bImportQuoteFromLink(id);
+  if(imported) return imported;
+
+  return {quote:null, index:-1};
+};
+try { findQuoteByApprovalId = window.findQuoteByApprovalId; } catch(e) {}
+
+/* Override approval portal with portable quote support. */
+window.renderQuoteApprovalPortal = function(id){
+  ensureV63 && ensureV63();
+  const f = findQuoteByApprovalId(id);
+  const q = f.quote;
+
+  if(!q){
+    $("#screen").innerHTML = `${pageHead("Quote Approval","",false)}
+    <section class="error-panel">
+      <b>Quote Not Found</b>
+      <p>This approval link is missing the quote data. Ask Rolling Wrench Diesel to resend the newest link.</p>
+    </section>`;
+    if(typeof bindPageTools === "function") bindPageTools();
+    return;
+  }
+
+  const legal = typeof quoteLegalText === "function" ? quoteLegalText() : "Customer approval authorizes the listed estimate. Price may vary due to added labor, hidden damage, parts availability, taxes/fees, or approved extra work.";
+  const statusPill = typeof quoteStatusPill === "function" ? quoteStatusPill(q.status || "Pending") : `<b>${q.status || "Pending"}</b>`;
+
+  $("#screen").innerHTML = `${pageHead("Quote Approval","",false)}
+  <section class="customer-approval-card">
+    <div class="approval-header"><div class="approval-logo">RW</div><div><h2>Quote Approval</h2><p>Rolling Wrench Diesel LLC</p></div></div>
+    <div>${statusPill}</div>
+    <div class="approval-summary">
+      <div class="approval-box"><b>Customer</b><span>${q.customer || "Customer"}</span></div>
+      <div class="approval-box"><b>Truck / VIN</b><span>${q.truck || "Truck"}</span></div>
+      <div class="approval-box"><b>Repair</b><span>${q.desc || q.work || "Repair estimate"}</span></div>
+      <div class="approval-box"><b>Estimated Total</b><span>${typeof money === "function" ? money(q.total || 0) : "$" + (q.total || 0)}</span></div>
+    </div>
+    <div class="approval-legal"><b>Authorization Terms:</b><br>${legal}</div>
+    ${typeof signatureBlock === "function" ? signatureBlock("customerQuote","Customer / Driver Approval Signature") : ""}
+    <label>Printed Name<input id="approvalName" placeholder="Customer / driver name"></label>
+    <label>Decline Reason / Notes<textarea id="declineReason" placeholder="Only needed if declining"></textarea></label>
+    <div class="approval-actions"><button class="approve" id="approveQuoteBtn">Approve & Sign</button><button class="decline" id="declineQuoteBtn">Decline</button></div>
+  </section>`;
+  if(typeof bindPageTools === "function") bindPageTools();
+  if(typeof setupSignaturePad === "function") setupSignaturePad("customerQuote");
+
+  $("#approveQuoteBtn").onclick = () => {
+    const sig = typeof saveSignature === "function" ? saveSignature("customerQuote") : null;
+    if(typeof approveQuote === "function" && approveQuote(id, $("#approvalName").value, sig)){
+      if(typeof toast === "function") toast("Quote approved");
+      renderQuoteApprovalPortal(id);
+    }
+  };
+  $("#declineQuoteBtn").onclick = () => {
+    if(typeof declineQuote === "function" && declineQuote(id, $("#approvalName").value, $("#declineReason").value)){
+      if(typeof toast === "function") toast("Quote declined");
+      renderQuoteApprovalPortal(id);
+    }
+  };
+};
+try { renderQuoteApprovalPortal = window.renderQuoteApprovalPortal; } catch(e) {}
+
+/* Refresh quote link boxes to show portable links. */
+const rw94bOldRenderQuoteSendCenter = typeof renderQuoteSendCenter === "function" ? renderQuoteSendCenter : null;
+function renderQuoteSendCenterPortable(){
+  if(rw94bOldRenderQuoteSendCenter) rw94bOldRenderQuoteSendCenter();
+  setTimeout(() => {
+    (state.quotes || []).forEach((q, i) => {
+      if(q.approvalId){
+        const compact = rw94bCompactQuote(q);
+        compact.approvalId = q.approvalId;
+        const data = rw94bB64Encode(compact);
+        const link = `${location.origin}${location.pathname}#quoteapproval-${q.approvalId}?q=${encodeURIComponent(data)}`;
+        const box = document.getElementById("quoteLink_" + i);
+        if(box) box.textContent = link;
+      }
+    });
+  }, 50);
+}
+window.renderQuoteSendCenter = renderQuoteSendCenterPortable;
+try { renderQuoteSendCenter = renderQuoteSendCenterPortable; } catch(e) {}

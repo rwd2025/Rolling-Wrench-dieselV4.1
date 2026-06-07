@@ -342,3 +342,9 @@ V9.4 QUOTE SAVE FIX:
 - Manifest/cache bumped to v94.
 
 V9.4a: Force Send to Quotes/Invoices to save and open Business page.
+
+V9.4b PORTABLE CUSTOMER QUOTE LINKS:
+- Quote approval links now include encoded quote payload.
+- Customer can open approval link on a different device.
+- Fixes "Quote Not Found" on customer phone.
+- Customer approval imports quote into their local app session for viewing/signing.
