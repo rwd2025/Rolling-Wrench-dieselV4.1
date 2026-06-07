@@ -5613,3 +5613,131 @@ async function rw94RunAI(text){
 }
 window.rw92RunAI = rw94RunAI;
 try { rw92RunAI = rw94RunAI; } catch(e) {}
+
+
+/* ===== V9.4a FORCE QUOTE PAGE SAVE + NAVIGATE ===== */
+function rw94aGetPendingPreview(){
+  return (state.v87 && state.v87.pending) || state.pendingQuote || state.currentQuote || state.lastPreview || null;
+}
+function rw94aFallbackQuote(){
+  const chats = state.brainChats || [];
+  const lastUser = [].slice.call(chats).reverse().find(function(m){ return m.role === "user" && String(m.text||"").toLowerCase().includes("quote"); });
+  const text = lastUser ? lastUser.text : "Quote";
+  if(typeof v87BuildPreview === "function"){
+    const p = v87BuildPreview(text, "quote");
+    state.v87 = state.v87 || {};
+    state.v87.pending = p;
+    return p;
+  }
+  return {
+    id: Date.now(),
+    type: "quote",
+    title: "Quote",
+    work: text,
+    customer: (state.truck && state.truck.customer) || "Add customer",
+    truck: (state.truck && (state.truck.unit || state.truck.vin)) || "No Active Truck",
+    engine: (state.truck && state.truck.engine) || "Cummins X15",
+    laborHours: 4,
+    laborRate: 135,
+    serviceCall: 250,
+    parts: 0,
+    supplies: 25,
+    total: 815
+  };
+}
+function rw94aOpenBusiness(){
+  setTimeout(function(){
+    try {
+      if(typeof setRoute === "function") setRoute("business");
+      else location.hash = "business";
+    } catch(e) {
+      location.hash = "business";
+    }
+  }, 150);
+}
+function rw94aSaveQuoteAndOpen(){
+  state.quotes = state.quotes || [];
+  let p = rw94aGetPendingPreview();
+  if(!p) p = rw94aFallbackQuote();
+
+  const q = Object.assign({}, p);
+  q.id = q.id || Date.now();
+  q.type = "quote";
+  q.status = "Quote Draft";
+  q.date = q.date || new Date().toLocaleDateString();
+  q.createdAt = q.createdAt || new Date().toISOString();
+  q.customer = q.customer || (state.truck && state.truck.customer) || "Add customer";
+  q.truck = q.truck || (state.truck && (state.truck.unit || state.truck.vin)) || "No Active Truck";
+  q.engine = q.engine || (state.truck && state.truck.engine) || "Cummins X15";
+
+  state.quotes.unshift(q);
+  state.v87 = state.v87 || {};
+  state.v87.pending = null;
+  state.pendingQuote = null;
+  state.currentQuote = null;
+  state.lastSavedQuoteId = q.id;
+
+  state.brainChats = state.brainChats || [];
+  state.brainChats.push({role:"ai", text:"Done. I saved it to Quotes and opened the quote page.", date:new Date().toLocaleString()});
+  if(typeof saveState === "function") saveState();
+  rw94aOpenBusiness();
+  if(typeof renderV92AI === "function") renderV92AI();
+  return true;
+}
+function rw94aSaveInvoiceAndOpen(){
+  state.invoices = state.invoices || [];
+  let p = rw94aGetPendingPreview();
+  if(!p) p = rw94aFallbackQuote();
+
+  const inv = Object.assign({}, p);
+  inv.id = inv.id || Date.now();
+  inv.type = "invoice";
+  inv.status = "Invoice Draft";
+  inv.date = inv.date || new Date().toLocaleDateString();
+  inv.createdAt = inv.createdAt || new Date().toISOString();
+
+  state.invoices.unshift(inv);
+  state.v87 = state.v87 || {};
+  state.v87.pending = null;
+  state.pendingQuote = null;
+  state.currentQuote = null;
+  state.lastSavedInvoiceId = inv.id;
+
+  state.brainChats = state.brainChats || [];
+  state.brainChats.push({role:"ai", text:"Done. I saved it to Invoices and opened the business page.", date:new Date().toLocaleString()});
+  if(typeof saveState === "function") saveState();
+  rw94aOpenBusiness();
+  if(typeof renderV92AI === "function") renderV92AI();
+  return true;
+}
+
+window.v87SavePending = function(type){
+  return type === "invoice" ? rw94aSaveInvoiceAndOpen() : rw94aSaveQuoteAndOpen();
+};
+try { v87SavePending = window.v87SavePending; } catch(e) {}
+
+document.addEventListener("click", function(e){
+  const btn = e.target.closest("button, .button, [role='button']");
+  if(!btn) return;
+  const t = String(btn.textContent || btn.value || "").toLowerCase();
+  if(t.includes("send to quote") || t.includes("save to quote")){
+    e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
+    rw94aSaveQuoteAndOpen();
+    return false;
+  }
+  if(t.includes("send to invoice") || t.includes("save to invoice")){
+    e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
+    rw94aSaveInvoiceAndOpen();
+    return false;
+  }
+}, true);
+
+const rw94aOldRunAI = typeof rw92RunAI === "function" ? rw92RunAI : null;
+async function rw94aRunAI(text){
+  const s = String(text || "").toLowerCase().trim();
+  if(s.includes("send to quote") || s.includes("save to quote")) return rw94aSaveQuoteAndOpen();
+  if(s.includes("send to invoice") || s.includes("save to invoice") || s.includes("build invoice from this quote")) return rw94aSaveInvoiceAndOpen();
+  if(rw94aOldRunAI) return await rw94aOldRunAI(text);
+}
+window.rw92RunAI = rw94aRunAI;
+try { rw92RunAI = rw94aRunAI; } catch(e) {}

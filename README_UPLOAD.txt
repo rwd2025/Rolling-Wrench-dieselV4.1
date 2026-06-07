@@ -340,3 +340,5 @@ V9.4 QUOTE SAVE FIX:
 - Chat commands "send to quotes" and "send to invoices" work.
 - Buttons containing "Send to Quote(s)" or "Send to Invoice(s)" are intercepted correctly.
 - Manifest/cache bumped to v94.
+
+V9.4a: Force Send to Quotes/Invoices to save and open Business page.
