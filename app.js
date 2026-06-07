@@ -6077,3 +6077,65 @@ window.rw95SetSupabaseAnonKey=function(key){
   return true;
 };
 window.RW_BUILD_VERSION="V9.5 Supabase Connector";
+
+
+/* ===== V9.5a SUPABASE AUTH HEADER FIX ===== */
+const RW_SUPABASE_DEFAULT_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV4cGtxd2NtdnRxdnViaWJicmVrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcyMzk4NjQsImV4cCI6MjA5MjgxNTg2NH0.afiaSFqkRFEXW5nPQVRXKZcpKkS6iF3T_hTQC2P15HQ";
+
+(function rw95aEnsureSupabaseAnonKey(){
+  try {
+    if(!localStorage.getItem("RW_SUPABASE_ANON_KEY")) {
+      localStorage.setItem("RW_SUPABASE_ANON_KEY", RW_SUPABASE_DEFAULT_ANON_KEY);
+    }
+    if(typeof state !== "undefined") {
+      state.settings = state.settings || {};
+      if(!state.settings.supabaseAnonKey) state.settings.supabaseAnonKey = RW_SUPABASE_DEFAULT_ANON_KEY;
+      if(typeof saveState === "function") saveState();
+    }
+  } catch(e) {}
+})();
+
+function rw95aSupabaseKey(){
+  try {
+    return RW_SUPABASE_DEFAULT_ANON_KEY ||
+      localStorage.getItem("RW_SUPABASE_ANON_KEY") ||
+      (state && state.settings && state.settings.supabaseAnonKey) ||
+      "";
+  } catch(e) {
+    return RW_SUPABASE_DEFAULT_ANON_KEY;
+  }
+}
+
+function rw95aHeaders(){
+  const key = rw95aSupabaseKey();
+  return {
+    "Content-Type": "application/json",
+    "apikey": key,
+    "Authorization": "Bearer " + key
+  };
+}
+
+/* Override V9.5 Supabase function caller so Authorization is never missing. */
+async function rw95CallFunction(name, payload){
+  const base = (typeof RW_SUPABASE_FUNCTIONS !== "undefined")
+    ? RW_SUPABASE_FUNCTIONS
+    : "https://uxpkqwcmvtqvubibbrek.supabase.co/functions/v1";
+
+  const res = await fetch(`${base}/${name}`, {
+    method: "POST",
+    headers: rw95aHeaders(),
+    body: JSON.stringify(payload || {})
+  });
+
+  const txt = await res.text();
+  let data;
+  try { data = JSON.parse(txt); } catch(e) { data = { text: txt }; }
+
+  if(!res.ok){
+    throw new Error(data.error || data.message || txt || `${name} failed`);
+  }
+  return data;
+}
+
+window.rw95CallFunction = rw95CallFunction;
+window.RW_BUILD_VERSION = "V9.5a Supabase Auth Fixed";

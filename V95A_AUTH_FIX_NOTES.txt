@@ -1,0 +1,13 @@
+Rolling Wrench AI V9.5a Auth Fix
+
+Fixes:
+- Supabase Edge Function calls now always include:
+  - apikey
+  - Authorization: Bearer <anon key>
+- Prevents "Missing authorization header"
+- Bumps manifest start_url to ?v=95a-auth
+- Bumps service worker cache to rolling-wrench-v95a-auth
+
+Test:
+- 3101874 cross reference
+- Need water pump for 2019 International ProStar X15
