@@ -348,3 +348,5 @@ V9.4b PORTABLE CUSTOMER QUOTE LINKS:
 - Customer can open approval link on a different device.
 - Fixes "Quote Not Found" on customer phone.
 - Customer approval imports quote into their local app session for viewing/signing.
+
+V9.5 SUPABASE CONNECTOR PATCH: AI->diesel-doc-ai, Parts->oracle-parts-search, Vision->rolling-wrench-vision-ai, Quotes/Invoices/Trucks/Customers/Dashboard via Supabase Edge Functions. Use ANON key only.

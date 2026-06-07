@@ -5963,3 +5963,117 @@ async function rw94cRunPartsLookup(){
    box.innerHTML='<h3>PARTS MASTER RESULT</h3><pre>'+((data.answer||data.message||JSON.stringify(data,null,2)))+'</pre>';
  }catch(e){console.error(e);}
 }
+
+
+/* ===== V9.5 SUPABASE EDGE FUNCTION CONNECTOR ===== */
+const RW_SUPABASE_URL = "https://uxpkqwcmvtqvubibbrek.supabase.co";
+const RW_SUPABASE_FUNCTIONS = RW_SUPABASE_URL + "/functions/v1";
+
+function rw95AnonKey(){
+  try {
+    return (state && state.settings && (state.settings.supabaseAnonKey || state.settings.SUPABASE_ANON_KEY)) ||
+      localStorage.getItem("RW_SUPABASE_ANON_KEY") || "";
+  } catch(e) {
+    return localStorage.getItem("RW_SUPABASE_ANON_KEY") || "";
+  }
+}
+function rw95Headers(){
+  const key = rw95AnonKey();
+  const h = {"Content-Type":"application/json"};
+  if(key){ h["apikey"] = key; h["Authorization"] = "Bearer " + key; }
+  return h;
+}
+async function rw95CallFunction(name, payload){
+  const res = await fetch(`${RW_SUPABASE_FUNCTIONS}/${name}`, {
+    method:"POST",
+    headers: rw95Headers(),
+    body: JSON.stringify(payload || {})
+  });
+  const txt = await res.text();
+  let data; try { data = JSON.parse(txt); } catch(e) { data = {text:txt}; }
+  if(!res.ok) throw new Error(data.error || data.message || txt || `${name} failed`);
+  return data;
+}
+function rw95Answer(data){
+  return data.answer || data.response || data.text || data.message || data.content || data.result || JSON.stringify(data,null,2);
+}
+function rw95LooksParts(q){
+  const s=String(q||"").toLowerCase();
+  return /\b\d{5,}\b/.test(s) || s.includes("cross reference") || s.includes("part number") || s.includes("oem") || s.includes("water pump") || s.includes("supplier") || s.includes("fleetguard") || s.includes("baldwin") || s.includes("donaldson") || s.includes("wix") || s.includes("napa");
+}
+function rw95LooksQuote(q){const s=String(q||"").toLowerCase();return s.includes("build quote")||s.includes("quote for")||s.includes("estimate");}
+function rw95LooksInvoice(q){const s=String(q||"").toLowerCase();return s.includes("build invoice")||s.includes("invoice for");}
+function rw95LooksTruck(q){const s=String(q||"").toLowerCase();return s.includes("truck search")||s.includes("find truck")||s.includes("decode vin")||/[A-HJ-NPR-Z0-9]{17}/i.test(s);}
+
+async function rw95AskSupabase(prompt, files){
+  const q=String(prompt||"");
+  const context={truck:state.truck||{},customer:state.customer||{},settings:state.settings||{},quotes:(state.quotes||[]).slice(0,5),invoices:(state.invoices||[]).slice(0,5)};
+  let fn="diesel-doc-ai";
+  let payload={prompt:q,question:q,query:q,context};
+  if(files&&files.length){fn="rolling-wrench-vision-ai";payload.files=files;}
+  else if(rw95LooksQuote(q)) fn="build-quote";
+  else if(rw95LooksInvoice(q)) fn="build-invoice";
+  else if(rw95LooksParts(q)) fn="oracle-parts-search";
+  else if(rw95LooksTruck(q)) fn="truck-search";
+  try{
+    const data=await rw95CallFunction(fn,payload);
+    if(fn==="build-quote" && data.quote){state.v87=state.v87||{};state.v87.pending=data.quote;state.currentQuote=data.quote;if(typeof saveState==="function")saveState();}
+    if(fn==="build-invoice" && data.invoice){state.currentInvoice=data.invoice;if(typeof saveState==="function")saveState();}
+    if(fn==="truck-search" && data.truck){state.truck=Object.assign({},state.truck||{},data.truck);if(typeof saveState==="function")saveState();}
+    return rw95Answer(data);
+  }catch(err){
+    if(typeof rw92AskBackend==="function" && rw92AskBackend!==rw95AskSupabase){
+      try{return (await rw92AskBackend(prompt,files))+`\n\n---\nSupabase route tried: ${fn}\nSupabase error: ${err.message}`;}catch(e){}
+    }
+    throw err;
+  }
+}
+window.rw95AskSupabase=rw95AskSupabase;
+try{window.rw92AskBackend=rw95AskSupabase;rw92AskBackend=rw95AskSupabase;}catch(e){}
+
+window.rw95PartsSearch=async function(query){return await rw95CallFunction("oracle-parts-search",{prompt:query,query,context:{truck:state.truck||{},settings:state.settings||{}}});};
+window.rw95VerifyPartWeb=async function(query){return await rw95CallFunction("verify-part-web",{prompt:query,query,context:{truck:state.truck||{},settings:state.settings||{}}});};
+window.rw95BuildQuote=async payload=>await rw95CallFunction("build-quote",payload);
+window.rw95BuildInvoice=async payload=>await rw95CallFunction("build-invoice",payload);
+window.rw95ConvertQuoteToInvoice=async payload=>await rw95CallFunction("convert-quote-to-invoice",payload);
+window.rw95SaveCustomer=async customer=>await rw95CallFunction("save-customer",{customer});
+window.rw95SaveTruck=async truck=>await rw95CallFunction("save-truck",{truck});
+window.rw95GetDashboard=async()=>await rw95CallFunction("get-dashboard",{context:{truck:state.truck||{}}});
+
+async function rw95LivePartsLookupFromPage(){
+  const inputs=Array.from(document.querySelectorAll("input, textarea"));
+  const q=inputs.map(x=>x.value).filter(Boolean).join("\n").trim();
+  let box=document.getElementById("rw95PartsResult");
+  if(!box){
+    box=document.createElement("div");
+    box.id="rw95PartsResult";
+    box.style.cssText="margin:16px 24px 120px;padding:16px;border:1px solid #ff7a18;border-radius:18px;background:#0d141c;color:white;white-space:pre-wrap;font-size:18px;line-height:1.45";
+    (document.querySelector("#screen")||document.body).appendChild(box);
+  }
+  if(!q){box.textContent="Add a part number, VIN, engine, or description first.";return;}
+  box.textContent="Searching Supabase Oracle Parts...";
+  try{
+    const data=await rw95PartsSearch(q);
+    box.innerHTML=`<b style="color:#ff7a18">PARTS MASTER RESULT</b><br><br>${String(rw95Answer(data)).replace(/\n/g,"<br>")}`;
+  }catch(e){box.textContent="Parts search error: "+e.message;}
+}
+document.addEventListener("click",function(e){
+  const btn=e.target.closest("button, .button, [role='button']");
+  if(!btn)return;
+  const text=String(btn.textContent||"").toLowerCase();
+  const screenText=String(document.body.textContent||"").toLowerCase();
+  if(screenText.includes("parts lookup")&&(text.includes("build search")||text.includes("fill"))){
+    e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();
+    rw95LivePartsLookupFromPage();
+    return false;
+  }
+},true);
+
+window.rw95SetSupabaseAnonKey=function(key){
+  localStorage.setItem("RW_SUPABASE_ANON_KEY",key||"");
+  state.settings=state.settings||{};
+  state.settings.supabaseAnonKey=key||"";
+  if(typeof saveState==="function")saveState();
+  return true;
+};
+window.RW_BUILD_VERSION="V9.5 Supabase Connector";
