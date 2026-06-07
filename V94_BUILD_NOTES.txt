@@ -1,0 +1,36 @@
+Rolling Wrench AI V9.4 Build Notes
+====================================
+
+Added files:
+- quantum-brain.js
+- V94_BUILD_NOTES.txt
+
+V9.4 Quantum Brain goals:
+- Self-healing storage repair
+- Quote/invoice/customer storage checks
+- iPhone PWA cache/service-worker repair support
+- Optional VIN/truck fields
+- Asset type support for semi, trailer, pickup, farm equipment, heavy equipment, construction equipment, forklift, generator, hydraulic unit, APU, and other
+- Full customer quote message builder
+- No-guessing parts logic foundation
+
+How to wire into index.html:
+Add this script before your main app script or near the bottom before </body>:
+
+<script src="quantum-brain.js"></script>
+
+Then you can call:
+
+RollingWrenchQuantumBrain.quantumSelfRepair()
+
+And for quote messages:
+
+RollingWrenchQuantumBrain.buildCustomerQuoteMessage(quote)
+
+Recommended V9.4 next steps:
+1. Add a Settings > System Test & Repair button.
+2. Button should run RollingWrenchQuantumBrain.quantumSelfRepair().
+3. Add Asset Type and Asset Description to quotes.
+4. Make VIN, truck, serial, unit number, make, model, and engine optional.
+5. Update the text message button to use buildCustomerQuoteMessage().
+6. Add Parts Brain backend later for live web/OEM/supplier search.

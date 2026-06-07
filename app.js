@@ -5949,3 +5949,17 @@ function renderQuoteSendCenterPortable(){
 }
 window.renderQuoteSendCenter = renderQuoteSendCenterPortable;
 try { renderQuoteSendCenter = renderQuoteSendCenterPortable; } catch(e) {}
+
+
+/* ===== V9.4c LIVE PARTS LOOKUP PAGE FIX ===== */
+async function rw94cRunPartsLookup(){
+ try{
+   const q=(document.querySelector('textarea')?.value||document.querySelector('input')?.value||'').trim();
+   const box=document.getElementById('rw94cPartsResult')||(()=>{const d=document.createElement('div');d.id='rw94cPartsResult';document.body.appendChild(d);return d;})();
+   box.innerHTML='Searching Parts Master...';
+   const url=(window.RW_LIVE_BACKEND_URL||'https://rolling-wrench-ai-backend.onrender.com')+'/api/parts';
+   const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:q,route:'parts'})});
+   const data=await res.json();
+   box.innerHTML='<h3>PARTS MASTER RESULT</h3><pre>'+((data.answer||data.message||JSON.stringify(data,null,2)))+'</pre>';
+ }catch(e){console.error(e);}
+}
